@@ -18,7 +18,6 @@ public class ResourceView
 
         var setup = new FeatureSetup();
 
-        // 1. Verifica todas em paralelo
         Console.WriteLine("\n Verificando recursos instalados...");
         var checkTasks = setup.Features
             .Select(async feature => new
@@ -108,8 +107,6 @@ public class ResourceView
                     break; 
                 }
             }
-    
-            if (sxsPath == "2") return "SAIR";
         }
 
         return sxsPath;
