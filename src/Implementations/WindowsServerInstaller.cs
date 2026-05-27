@@ -14,9 +14,14 @@ public class WindowsServerInstaller : IFeatureInstaller
         return output.Trim().Equals("True", StringComparison.OrdinalIgnoreCase);
     }
 
-    public async Task<bool> InstallFeatureAsync(WindowsFeature feature)
+    public async Task<bool> InstallFeatureAsync(WindowsFeature feature, string? sxsPath = null)
     {
-        var arguments = $"-Command \"Install-WindowsFeature -Name {feature.ServerName} -IncludeAllSubFeature\"";
-        return await ProcessExecutor.RunPowerShellCommandAsync(arguments, feature.FriendlyName);
+        var offlineArgs = string.IsNullOrWhiteSpace(sxsPath) 
+            ? "" 
+            : $" -Source \"{sxsPath}\"";
+
+        var command = $"Install-WindowsFeature -Name {feature.ServerName}{offlineArgs}";       
+        
+        return await ProcessExecutor.RunPowerShellCommandAsync(command, feature.FriendlyName);
     }
 }
