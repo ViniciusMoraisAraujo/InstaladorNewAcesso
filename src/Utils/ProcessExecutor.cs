@@ -12,7 +12,6 @@ public static class ProcessExecutor
         RedirectStandardError = true,
         UseShellExecute = false,
         CreateNoWindow = true,
-        Verb = "runas"
     };
     
     public static async Task<bool> RunPowerShellCommandAsync(string arguments, string featureName)
@@ -33,17 +32,21 @@ public static class ProcessExecutor
             {
                 Console.ForegroundColor = ConsoleColor.Green;
                 Console.WriteLine($"[SUCESSO] Ativado: {featureName}");
+                Console.WriteLine(output.Trim());
+
                 return true;
             }
-
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"[FAIL] Ativado: {featureName}");
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"[AVISO DE VERIFICAÇÃO] {error.Trim()}");
             return false;
         }
         catch (Exception ex)
         {
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"[FAIL] Erro: {featureName}");
+            Console.WriteLine(ex.Message);
             return false;
         }
         finally
@@ -74,9 +77,13 @@ public static class ProcessExecutor
 
             return output.Trim();
         }
-        catch
+        catch(Exception ex)
         {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"[ERRO] Falha ao executar PowerShell: {ex.Message}");
+            Console.ResetColor();
             return string.Empty;
+            
         }
     }
 }
