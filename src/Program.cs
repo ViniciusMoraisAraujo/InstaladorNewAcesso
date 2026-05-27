@@ -1,7 +1,5 @@
 ﻿using System.Security.Principal;
-using InstaladorNewAcesso.Implementations;
-using InstaladorNewAcesso.Interfaces;
-using InstaladorNewAcesso.Models;
+using InstaladorNewAcesso.Views;
 
 using var identity = WindowsIdentity.GetCurrent();
 var principal = new WindowsPrincipal(identity);
@@ -15,21 +13,5 @@ if (!isAdmin)
     return;
 }
 
-
-Console.WriteLine("Carregando Recursos");
-IFeatureInstaller create = InstallerFactory.Create();
-var setup = new FeatureSetup();
-foreach (var feature in setup.Features)
-{
-    Console.WriteLine($"\n Verificando: {feature.FriendlyName}");
-    var alreadyExists = await create.IsFeatureInstalledAsync(feature);
-    if (alreadyExists)
-    {
-        Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine($"[IGNORADO] {feature.FriendlyName} já está ativo no sistema.");
-        Console.ResetColor();
-        continue; 
-    }
-    Console.WriteLine($"\n Processando: {feature.FriendlyName}");
-    await create.InstallFeatureAsync(feature);
-}
+var view = new ResourceView();
+await view.ExecuteInstallAsync();
