@@ -1,4 +1,6 @@
-﻿namespace InstaladorNewAcesso.Models;
+﻿using InstaladorNewAcesso.Models;
+
+namespace InstaladorNewAcesso.Configurations;
 
 public class FeatureSetup
 {
