@@ -1,0 +1,87 @@
+﻿using InstaladorNewAcesso.Models;
+using InstaladorNewAcesso.Utils;
+
+namespace InstaladorNewAcesso.Views;
+
+public class IISView
+{
+    private readonly IISInstaler _installer = new();
+
+    public async Task ExecuteAsync(InstallationPaths paths)
+    {
+        MostrarCabecalho();
+
+        await ConfigurarAppPool("WebAppDS", "v4.0", "Integrated", paths);
+        await ConfigurarAppPool("WebAppUI", "v4.0", "Integrated", paths);
+
+        await ConfigurarSite("WebAppDS", "WebAppDS", paths.WebAppDS, 8080);
+        await ConfigurarSite("WebAppUI", "WebAppUI", paths.WebAppUI, 8081);
+
+        MostrarFim();
+    }
+
+    private async Task ConfigurarAppPool(string name, string runtime, string pipeline, InstallationPaths paths)
+    {
+        Console.Write($"\n Verificando AppPool: {name.PadRight(20)}... ");
+
+        if (await _installer.AppPoolExistsAsync(name))
+        {
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("[IGNORADO] Já existe.");
+            Console.ResetColor();
+            return;
+        }
+
+        Console.ForegroundColor = ConsoleColor.Blue;
+        Console.WriteLine("[CRIANDO]");
+        Console.ResetColor();
+
+        bool sucesso = await _installer.CreateApplicationPoolAsync(name, runtime, pipeline);
+
+        Console.ForegroundColor = sucesso ? ConsoleColor.Green : ConsoleColor.Red;
+        Console.WriteLine(sucesso ? $"-> [SUCESSO] AppPool {name} criada." : $"-> [FALHA] Erro ao criar AppPool {name}.");
+        Console.ResetColor();
+    }
+
+    private async Task ConfigurarSite(string name, string poolName, string physicalPath, int port)
+    {
+        Console.Write($"\n Verificando Site: {name.PadRight(20)}... ");
+
+        if (await _installer.SiteExistsAsync(name))
+        {
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("[IGNORADO] Já existe.");
+            Console.ResetColor();
+            return;
+        }
+
+        Console.ForegroundColor = ConsoleColor.Blue;
+        Console.WriteLine("[CRIANDO]");
+        Console.ResetColor();
+
+        bool sucesso = await _installer.CreateSiteAsync(name, poolName, physicalPath, port);
+
+        Console.ForegroundColor = sucesso ? ConsoleColor.Green : ConsoleColor.Red;
+        Console.WriteLine(sucesso ? $"-> [SUCESSO] Site {name} criado na porta {port}." : $"-> [FALHA] Erro ao criar Site {name}.");
+        Console.ResetColor();
+    }
+
+    private void MostrarCabecalho()
+    {
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine("==================================================");
+        Console.WriteLine("          CONFIGURAÇÃO DO IIS                     ");
+        Console.WriteLine("==================================================");
+        Console.ResetColor();
+    }
+
+    private void MostrarFim()
+    {
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine("\n==================================================");
+        Console.WriteLine("      Fim da etapa de Configuração do IIS.        ");
+        Console.WriteLine("==================================================");
+        Console.ResetColor();
+        Console.ReadKey();
+    }
+}
