@@ -7,6 +7,7 @@ public class MainMenuView
     private readonly ResourceView _resourceView = new();
     private readonly DirectoryView _directoryView = new();
     private readonly IISView _iisView = new();
+    private readonly MsiInstallationView _msiView = new();
     private InstallationPaths? _paths;
 
     public async Task ExecuteAsync()
@@ -29,6 +30,10 @@ public class MainMenuView
                 case "3":
                     if (!GarantirPaths()) break;
                     await _iisView.ExecuteAsync(_paths!);
+                    break;
+                case "4":
+                    if (!GarantirPaths()) break;
+                    await _msiView.ExecuteAsync(_paths!);
                     break;
                 case "0":
                     MostrarSaida();
@@ -55,6 +60,7 @@ public class MainMenuView
         Console.WriteLine(" [1] Instalar Recursos do Windows");
         Console.WriteLine(" [2] Criar Diretórios");
         Console.WriteLine(" [3] Configurar IIS");
+        Console.WriteLine(" [4] Instalar Aplicações (MSIs)");
         Console.WriteLine(" [0] Sair");
         Console.WriteLine();
         Console.Write(" Escolha uma opção: ");
