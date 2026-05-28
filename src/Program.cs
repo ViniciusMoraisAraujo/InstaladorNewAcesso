@@ -13,5 +13,5 @@ if (!isAdmin)
     return;
 }
 
-var view = new ResourceView();
-await view.ExecuteInstallAsync();
+var view = new MainMenuView();
+await view.ExecuteAsync();

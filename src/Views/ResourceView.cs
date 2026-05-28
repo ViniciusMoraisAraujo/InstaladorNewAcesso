@@ -1,5 +1,5 @@
-﻿using InstaladorNewAcesso.Implementations;
-using InstaladorNewAcesso.Models;
+﻿using InstaladorNewAcesso.Configurations;
+using InstaladorNewAcesso.Implementations;
 
 
 namespace InstaladorNewAcesso.Views;
