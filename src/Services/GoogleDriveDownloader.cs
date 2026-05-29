@@ -1,9 +1,5 @@
 ﻿namespace InstaladorNewAcesso.Services;
 
-/// <summary>
-/// Baixa recursivamente uma pasta do Google Drive (compartilhada como "qualquer pessoa com o link")
-/// usando apenas a Drive API v3 com API Key — sem OAuth, sem SDK.
-/// </summary>
 public class GoogleDriveDownloader
 {
     private const string ApiBase = "https://www.googleapis.com/drive/v3";
@@ -17,35 +13,23 @@ public class GoogleDriveDownloader
         _http = new HttpClient();
         _http.Timeout = TimeSpan.FromMinutes(10);
     }
-
-    /// <summary>
-    /// Extrai o ID de uma URL do Google Drive.
-    /// Suporta formatos: /folders/ID, /drive/folders/ID, id=ID
-    /// </summary>
+    
     public static string? ExtractFolderId(string url)
     {
-        // https://drive.google.com/drive/folders/FOLDER_ID
-        // https://drive.google.com/drive/u/0/folders/FOLDER_ID
         var match = System.Text.RegularExpressions.Regex.Match(
             url, @"folders/([a-zA-Z0-9_-]+)");
         if (match.Success) return match.Groups[1].Value;
 
-        // https://drive.google.com/open?id=FOLDER_ID
         match = System.Text.RegularExpressions.Regex.Match(
             url, @"[?&]id=([a-zA-Z0-9_-]+)");
         if (match.Success) return match.Groups[1].Value;
 
-        // Já é um ID puro
         if (System.Text.RegularExpressions.Regex.IsMatch(url, @"^[a-zA-Z0-9_-]{10,}$"))
             return url;
 
         return null;
     }
 
-    /// <summary>
-    /// Baixa toda a estrutura da pasta do Drive para <paramref name="localRoot"/>.
-    /// Mantém a hierarquia de subpastas igual à do Drive.
-    /// </summary>
     public async Task DownloadFolderAsync(string folderId, string localRoot, IProgress<string>? progress = null)
     {
         Directory.CreateDirectory(localRoot);
@@ -103,8 +87,6 @@ public class GoogleDriveDownloader
         await using var fs = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.None);
         await response.Content.CopyToAsync(fs);
     }
-
-    // DTOs internos para desserializar a resposta da API
     private class DriveListResponse
     {
         public List<DriveFile>? Files { get; set; }
