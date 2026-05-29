@@ -9,18 +9,18 @@ public class IISView
 
     public async Task ExecuteAsync(InstallationPaths paths)
     {
-        MostrarCabecalho();
+        ShowHeader();
 
-        await ConfigurarAppPool("WebAppDS", "v4.0", "Integrated", paths);
-        await ConfigurarAppPool("WebAppUI", "v4.0", "Integrated", paths);
+        await ConfigureAppPool("WebAppDS", "v4.0", "Integrated", paths);
+        await ConfigureAppPool("WebAppUI", "v4.0", "Integrated", paths);
 
-        await ConfigurarSite("WebAppDS", "WebAppDS", paths.WebAppDS, 8080);
-        await ConfigurarSite("WebAppUI", "WebAppUI", paths.WebAppUI, 8081);
+        await ConfigureSite("WebAppDS", "WebAppDS", paths.WebAppDS, 8080);
+        await ConfigureSite("WebAppUI", "WebAppUI", paths.WebAppUI, 8081);
 
-        MostrarFim();
+        ShowFinishedMessage();
     }
 
-    private async Task ConfigurarAppPool(string name, string runtime, string pipeline, InstallationPaths paths)
+    private async Task ConfigureAppPool(string name, string runtime, string pipeline, InstallationPaths paths)
     {
         Console.Write($"\n Verificando AppPool: {name.PadRight(20)}... ");
 
@@ -43,7 +43,7 @@ public class IISView
         Console.ResetColor();
     }
 
-    private async Task ConfigurarSite(string name, string poolName, string physicalPath, int port)
+    private async Task ConfigureSite(string name, string poolName, string physicalPath, int port)
     {
         Console.Write($"\n Verificando Site: {name.PadRight(20)}... ");
 
@@ -66,7 +66,7 @@ public class IISView
         Console.ResetColor();
     }
 
-    private void MostrarCabecalho()
+    private void ShowHeader()
     {
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine("==================================================");
@@ -75,7 +75,7 @@ public class IISView
         Console.ResetColor();
     }
 
-    private void MostrarFim()
+    private void ShowFinishedMessage()
     {
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine("\n==================================================");
