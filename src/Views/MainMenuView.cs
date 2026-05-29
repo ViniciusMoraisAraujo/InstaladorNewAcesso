@@ -35,6 +35,7 @@ public class MainMenuView
                     if (!GarantirPaths()) break;
                     await _msiView.ExecuteAsync(_paths!);
                     break;
+
                 case "0":
                     MostrarSaida();
                     return;
