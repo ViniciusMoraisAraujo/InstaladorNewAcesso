@@ -1,0 +1,120 @@
+﻿namespace InstaladorNewAcesso.Services;
+
+/// <summary>
+/// Baixa recursivamente uma pasta do Google Drive (compartilhada como "qualquer pessoa com o link")
+/// usando apenas a Drive API v3 com API Key — sem OAuth, sem SDK.
+/// </summary>
+public class GoogleDriveDownloader
+{
+    private const string ApiBase = "https://www.googleapis.com/drive/v3";
+
+    private readonly string _apiKey;
+    private readonly HttpClient _http;
+
+    public GoogleDriveDownloader(string apiKey)
+    {
+        _apiKey = apiKey;
+        _http = new HttpClient();
+        _http.Timeout = TimeSpan.FromMinutes(10);
+    }
+
+    /// <summary>
+    /// Extrai o ID de uma URL do Google Drive.
+    /// Suporta formatos: /folders/ID, /drive/folders/ID, id=ID
+    /// </summary>
+    public static string? ExtractFolderId(string url)
+    {
+        // https://drive.google.com/drive/folders/FOLDER_ID
+        // https://drive.google.com/drive/u/0/folders/FOLDER_ID
+        var match = System.Text.RegularExpressions.Regex.Match(
+            url, @"folders/([a-zA-Z0-9_-]+)");
+        if (match.Success) return match.Groups[1].Value;
+
+        // https://drive.google.com/open?id=FOLDER_ID
+        match = System.Text.RegularExpressions.Regex.Match(
+            url, @"[?&]id=([a-zA-Z0-9_-]+)");
+        if (match.Success) return match.Groups[1].Value;
+
+        // Já é um ID puro
+        if (System.Text.RegularExpressions.Regex.IsMatch(url, @"^[a-zA-Z0-9_-]{10,}$"))
+            return url;
+
+        return null;
+    }
+
+    /// <summary>
+    /// Baixa toda a estrutura da pasta do Drive para <paramref name="localRoot"/>.
+    /// Mantém a hierarquia de subpastas igual à do Drive.
+    /// </summary>
+    public async Task DownloadFolderAsync(string folderId, string localRoot, IProgress<string>? progress = null)
+    {
+        Directory.CreateDirectory(localRoot);
+        await DownloadFolderRecursiveAsync(folderId, localRoot, progress);
+    }
+
+    private async Task DownloadFolderRecursiveAsync(string folderId, string localPath, IProgress<string>? progress)
+    {
+        string? pageToken = null;
+
+        do
+        {
+            var url = $"{ApiBase}/files" +
+                      $"?q={Uri.EscapeDataString($"'{folderId}' in parents and trashed=false")}" +
+                      $"&fields=nextPageToken,files(id,name,mimeType)" +
+                      $"&pageSize=1000" +
+                      $"&key={_apiKey}" +
+                      (pageToken != null ? $"&pageToken={pageToken}" : "");
+
+            var json = await _http.GetStringAsync(url);
+            var response = System.Text.Json.JsonSerializer.Deserialize<DriveListResponse>(json,
+                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            if (response?.Files == null) break;
+
+            foreach (var item in response.Files)
+            {
+                if (item.MimeType == "application/vnd.google-apps.folder")
+                {
+                    var subFolder = Path.Combine(localPath, item.Name);
+                    Directory.CreateDirectory(subFolder);
+                    progress?.Report($"Pasta: {item.Name}");
+                    await DownloadFolderRecursiveAsync(item.Id, subFolder, progress);
+                }
+                else
+                {
+                    var filePath = Path.Combine(localPath, item.Name);
+                    progress?.Report($"Baixando: {item.Name}");
+                    await DownloadFileAsync(item.Id, filePath);
+                }
+            }
+
+            pageToken = response.NextPageToken;
+
+        } while (pageToken != null);
+    }
+
+    private async Task DownloadFileAsync(string fileId, string destPath)
+    {
+        var url = $"{ApiBase}/files/{fileId}?alt=media&key={_apiKey}";
+
+        using var response = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        response.EnsureSuccessStatusCode();
+
+        await using var fs = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.None);
+        await response.Content.CopyToAsync(fs);
+    }
+
+    // DTOs internos para desserializar a resposta da API
+    private class DriveListResponse
+    {
+        public List<DriveFile>? Files { get; set; }
+        public string? NextPageToken { get; set; }
+    }
+
+    private class DriveFile
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string MimeType { get; set; } = "";
+    }
+}
