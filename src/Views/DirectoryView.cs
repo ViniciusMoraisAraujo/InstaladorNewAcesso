@@ -5,7 +5,7 @@ namespace InstaladorNewAcesso.Views;
 
 public class DirectoryView
 {
-    public void ExecuteDirectoryCreation(InstallationPaths basePath)
+    public void ExecuteAsync(InstallationPaths basePath)
     {
         var setup = new DirectorySetup();
         
