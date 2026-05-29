@@ -5,7 +5,7 @@ namespace InstaladorNewAcesso.Views;
 
 public class IisView
 {
-    private readonly IisInstaler _installer = new();
+    private readonly IisInstaller _installer = new();
 
     public async Task ExecuteAsync(InstallationPaths paths)
     {

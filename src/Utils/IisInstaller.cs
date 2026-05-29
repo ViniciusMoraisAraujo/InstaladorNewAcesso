@@ -2,7 +2,7 @@
 
 namespace InstaladorNewAcesso.Utils;
 
-public class IisInstaler : IIisInstaler
+public class IisInstaller : IIisInstaller
 {
     public async Task<bool> CreateApplicationPoolAsync(string name, string runtimeVersion, string pipelineMode)
     {
