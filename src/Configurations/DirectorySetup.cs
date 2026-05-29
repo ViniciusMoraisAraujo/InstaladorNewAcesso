@@ -7,7 +7,8 @@ public class DirectorySetup
     private static readonly Dictionary<string, string[]> FoldersWithChildren = new()
     {
         ["Controller"] = ["ControleAcesso", "CoreWs", "Fabricantes", "Task"],
-        ["ControllerOffline"] = ["Arquivos", "WinService_Ex", "WinService_In"]
+        ["ControllerOffline"] = ["Arquivos", "WinService_Ex", "WinService_In"],
+        ["WebAppUI"] = ["Fabricantes"]
     };
 
     public IEnumerable<string> GetAllPaths(InstallationPaths paths)
