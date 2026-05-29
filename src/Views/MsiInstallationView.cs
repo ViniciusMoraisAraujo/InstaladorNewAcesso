@@ -6,29 +6,35 @@ namespace InstaladorNewAcesso.Views;
 
 public class MsiInstallationView
 {
-    private const string GoogleApiKey = "SUA_API_KEY_AQUI";
+    private string GetGoogleApiKey()
+    {
+        var apiKey = Environment.GetEnvironmentVariable("NEWACESSO_GOOGLE_API_KEY");
+        if (!string.IsNullOrEmpty(apiKey)) return apiKey;
+        
+        return "SUA_API_KEY_VERDADEIRA_AQUI"; 
+    }
 
     public async Task ExecuteAsync(InstallationPaths paths)
     {
-        MostrarCabecalho();
+        ShowHeader();
 
-        var dbChoice = PerguntarTipoBanco();
+        var dbChoice = PromptDatabaseType();
         if (dbChoice == null) return;
 
-        var msiSourceDir = await ObterDiretorioFonte(paths);
+        var msiSourceDir = await GetSourceDirectory(paths);
         if (msiSourceDir == null) return;
 
-        var scanner = new MsiScanner(paths, dbChoice, msiSourceDir);
+        var logger = new ConsoleLogger();
+        var classifier = new MsiClassifier(paths, logger);
+        var scanner = new MsiScanner(paths, dbChoice, msiSourceDir, classifier, logger);
 
-        // MSIs obrigatórios
         var tasks = scanner.Scan();
 
-        // Fabricantes: usuário escolhe individualmente
-        var fabricantesDisponiveis = scanner.ScanFabricantes();
-        if (fabricantesDisponiveis.Count > 0)
+        var manufacturersAvailable = scanner.ScanManufacturers();
+        if (manufacturersAvailable.Count > 0)
         {
-            var selecionados = SelecionarFabricantes(fabricantesDisponiveis);
-            tasks.AddRange(selecionados);
+            var selectedManufacturers = SelectManufacturers(manufacturersAvailable);
+            tasks.AddRange(selectedManufacturers);
         }
         else
         {
@@ -57,47 +63,37 @@ public class MsiInstallationView
             return;
         }
 
-        int sucessos = 0, falhas = 0;
+        int successes = 0, failures = 0;
 
         foreach (var task in tasks)
         {
             Console.Write($"\n Instalando {Path.GetFileName(task.MsiPath)}... ");
 
-            string args;
+            string args = $"TARGETDIR=\"{task.TargetDirectory}\"";
+
             if (task.IsWebApp)
             {
-                // Web apps do IIS: não passar TARGETDIR.
-                // O MSI usa o diretório físico já configurado no Site.
-                args = "";
-                if (!string.IsNullOrEmpty(task.SiteName))    args += $"SITE=\"{task.SiteName}\" ";
-                if (!string.IsNullOrEmpty(task.AppPoolName)) args += $"APPPOOL=\"{task.AppPoolName}\" ";
+                if (!string.IsNullOrEmpty(task.SiteName))    args += $" WEBSITE=\"{task.SiteName}\"";
+                if (!string.IsNullOrEmpty(task.AppPoolName)) args += $" APPPOOL=\"{task.AppPoolName}\"";
             }
-            else
-            {
-                Directory.CreateDirectory(task.TargetDirectory);
-                args = $"TARGETDIR=\"{task.TargetDirectory}\"";
-            }
-            if (!string.IsNullOrEmpty(task.ExtraArgs)) args += $" {task.ExtraArgs}";
+
+            if (!string.IsNullOrEmpty(task.ExtraArgs)) 
+                args += $" {task.ExtraArgs}";
 
             var success = await MsiInstaller.InstallMsiAsync(task.MsiPath, args);
-            if (success) sucessos++; else falhas++;
+            if (success) successes++; else failures++;
 
             if (success && task.FilesToCopy.Count > 0)
-                CopiarArquivosExtras(task.FilesToCopy);
+                CopyExtraFiles(task.FilesToCopy);
         }
 
-        MostrarResumo(sucessos, falhas);
+        ShowSummary(successes, failures);
     }
-
-    // -------------------------------------------------------------------------
-    // Seleção de fabricantes
-    // -------------------------------------------------------------------------
-
-    private List<MsiInstallationModel> SelecionarFabricantes(
-        Dictionary<string, MsiInstallationModel> fabricantes)
+    
+    private List<MsiInstallationModel> SelectManufacturers(Dictionary<string, MsiInstallationModel> manufacturers)
     {
-        var nomes = fabricantes.Keys.OrderBy(n => n).ToList();
-        var selecionados = new HashSet<int>();
+        var names = manufacturers.Keys.OrderBy(n => n).ToList();
+        var selected = new HashSet<int>();
 
         while (true)
         {
@@ -110,11 +106,11 @@ public class MsiInstallationView
             Console.WriteLine(" Digite o número para marcar/desmarcar.");
             Console.WriteLine(" [A] Todos   [0] Confirmar\n");
 
-            for (int i = 0; i < nomes.Count; i++)
+            for (int i = 0; i < names.Count; i++)
             {
-                var marcado = selecionados.Contains(i) ? "[X]" : "[ ]";
-                Console.ForegroundColor = selecionados.Contains(i) ? ConsoleColor.Green : ConsoleColor.White;
-                Console.WriteLine($"  {marcado} {i + 1,2}. {nomes[i]}");
+                var marked = selected.Contains(i) ? "[X]" : "[ ]";
+                Console.ForegroundColor = selected.Contains(i) ? ConsoleColor.Green : ConsoleColor.White;
+                Console.WriteLine($"  {marked} {i + 1,2}. {names[i]}");
                 Console.ResetColor();
             }
 
@@ -125,16 +121,16 @@ public class MsiInstallationView
 
             if (input == "A")
             {
-                if (selecionados.Count == nomes.Count) selecionados.Clear();
-                else for (int i = 0; i < nomes.Count; i++) selecionados.Add(i);
+                if (selected.Count == names.Count) selected.Clear();
+                else for (int i = 0; i < names.Count; i++) selected.Add(i);
                 continue;
             }
 
-            if (int.TryParse(input, out int idx) && idx >= 1 && idx <= nomes.Count)
+            if (int.TryParse(input, out int idx) && idx >= 1 && idx <= names.Count)
             {
                 var i = idx - 1;
-                if (selecionados.Contains(i)) selecionados.Remove(i);
-                else selecionados.Add(i);
+                if (selected.Contains(i)) selected.Remove(i);
+                else selected.Add(i);
             }
             else
             {
@@ -144,48 +140,41 @@ public class MsiInstallationView
             }
         }
 
-        var escolhidos = selecionados.OrderBy(i => i).Select(i => fabricantes[nomes[i]]).ToList();
+        var chosen = selected.OrderBy(i => i).Select(i => manufacturers[names[i]]).ToList();
 
-        Console.ForegroundColor = escolhidos.Count > 0 ? ConsoleColor.Green : ConsoleColor.Yellow;
-        Console.WriteLine(escolhidos.Count > 0
-            ? $"\n Fabricantes selecionados: {string.Join(", ", selecionados.OrderBy(i => i).Select(i => nomes[i]))}"
+        Console.ForegroundColor = chosen.Count > 0 ? ConsoleColor.Green : ConsoleColor.Yellow;
+        Console.WriteLine(chosen.Count > 0
+            ? $"\n Fabricantes selecionados: {string.Join(", ", selected.OrderBy(i => i).Select(i => names[i]))}"
             : "\n Nenhum fabricante selecionado.");
         Console.ResetColor();
 
-        return escolhidos;
+        return chosen;
     }
+    
 
-    // -------------------------------------------------------------------------
-    // Cópia de arquivos extras (.Configuracao.dll)
-    // -------------------------------------------------------------------------
-
-    private void CopiarArquivosExtras(Dictionary<string, string> filesToCopy)
+    private void CopyExtraFiles(Dictionary<string, string> filesToCopy)
     {
-        foreach (var (origem, destino) in filesToCopy)
+        foreach (var (source, destination) in filesToCopy)
         {
             try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(destino)!);
-                File.Copy(origem, destino, overwrite: true);
+                File.Copy(source, destination, overwrite: true);
 
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine($"  [COPIADO] {Path.GetFileName(destino)} → {Path.GetDirectoryName(destino)}");
+                Console.WriteLine($"  [COPIADO] {Path.GetFileName(destination)} → {Path.GetDirectoryName(destination)}");
                 Console.ResetColor();
             }
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"  [ERRO] Falha ao copiar {Path.GetFileName(origem)}: {ex.Message}");
+                Console.WriteLine($"  [ERRO] Falha ao copiar {Path.GetFileName(source)}: {ex.Message}");
                 Console.ResetColor();
             }
         }
     }
+    
 
-    // -------------------------------------------------------------------------
-    // Fonte dos instaladores
-    // -------------------------------------------------------------------------
-
-    private async Task<string?> ObterDiretorioFonte(InstallationPaths paths)
+    private async Task<string?> GetSourceDirectory(InstallationPaths paths)
     {
         Console.WriteLine("\n De onde deseja obter os instaladores?");
         Console.WriteLine(" [1] Local");
@@ -195,13 +184,13 @@ public class MsiInstallationView
 
         return Console.ReadLine()?.Trim() switch
         {
-            "1" => ObterDiretorioLocal(paths),
-            "2" => await BaixarDoDrive(paths),
+            "1" => GetLocalDirectory(paths),
+            "2" => await DownloadFromDrive(paths),
             _   => null
         };
     }
 
-    private string? ObterDiretorioLocal(InstallationPaths paths)
+    private string? GetLocalDirectory(InstallationPaths paths)
     {
         var defaultPath = Path.Combine(paths.InstallationPath, "PrimeAcesso V5.9");
 
@@ -223,7 +212,7 @@ public class MsiInstallationView
         return dir;
     }
 
-    private async Task<string?> BaixarDoDrive(InstallationPaths paths)
+    private async Task<string?> DownloadFromDrive(InstallationPaths paths)
     {
         Console.Write("\n Cole o link da pasta no Google Drive: ");
         var url = Console.ReadLine()?.Trim();
@@ -249,7 +238,7 @@ public class MsiInstallationView
 
         try
         {
-            var downloader = new GoogleDriveDownloader(GoogleApiKey);
+            var downloader = new GoogleDriveDownloader(GetGoogleApiKey());
             var progress = new Progress<string>(msg =>
             {
                 Console.ForegroundColor = ConsoleColor.DarkGray;
@@ -274,11 +263,7 @@ public class MsiInstallationView
         }
     }
 
-    // -------------------------------------------------------------------------
-    // UI helpers
-    // -------------------------------------------------------------------------
-
-    private string? PerguntarTipoBanco()
+    private string? PromptDatabaseType()
     {
         Console.WriteLine("\n Qual banco de dados será utilizado?");
         Console.WriteLine(" [1] SQL Server");
@@ -294,7 +279,7 @@ public class MsiInstallationView
         };
     }
 
-    private void MostrarCabecalho()
+    private void ShowHeader()
     {
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine("==================================================");
@@ -303,7 +288,7 @@ public class MsiInstallationView
         Console.ResetColor();
     }
 
-    private void MostrarResumo(int sucessos, int falhas)
+    private void ShowSummary(int successes, int failures)
     {
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine("\n==================================================");
@@ -311,11 +296,11 @@ public class MsiInstallationView
         Console.WriteLine("==================================================");
         Console.ResetColor();
 
-        Console.WriteLine($" Pacotes instalados com sucesso: {sucessos}");
-        if (falhas > 0)
+        Console.WriteLine($" Pacotes instalados com sucesso: {successes}");
+        if (failures > 0)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($" Pacotes com falha: {falhas}");
+            Console.WriteLine($" Pacotes com falha: {failures}");
             Console.WriteLine(" Verifique os logs em %temp% para mais detalhes.");
             Console.ResetColor();
         }
@@ -329,3 +314,4 @@ public class MsiInstallationView
         Console.ReadKey();
     }
 }
+
