@@ -3,9 +3,9 @@ using InstaladorNewAcesso.Utils;
 
 namespace InstaladorNewAcesso.Views;
 
-public class IISView
+public class IisView
 {
-    private readonly IISInstaler _installer = new();
+    private readonly IisInstaler _installer = new();
 
     public async Task ExecuteAsync(InstallationPaths paths)
     {

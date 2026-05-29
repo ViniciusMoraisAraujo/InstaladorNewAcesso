@@ -6,7 +6,7 @@ public class MainMenuView
 {
     private readonly ResourceView _resourceView = new();
     private readonly DirectoryView _directoryView = new();
-    private readonly IISView _iisView = new();
+    private readonly IisView _iisView = new();
     //private readonly MsiInstallationView _msiView = new();
     private InstallationPaths? _paths;
 

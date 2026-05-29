@@ -1,6 +1,6 @@
 ﻿namespace InstaladorNewAcesso.Interfaces;
 
-public interface IIISInstaler
+public interface IIisInstaler
 {
     Task<bool> CreateApplicationPoolAsync(string name, string runtimeVersion, string pipelineMode);
     Task<bool> CreateSiteAsync(string name, string poolName, string physicalPath, int port);
