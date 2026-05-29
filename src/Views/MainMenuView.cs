@@ -14,30 +14,30 @@ public class MainMenuView
     {
         while (true)
         {
-            MostrarMenu();
+            ShowMenu();
             var opcao = Console.ReadLine()?.Trim();
 
             switch (opcao)
             {
                 case "1":
-                    await _resourceView.ExecuteInstallAsync();
+                    await _resourceView.ExecuteAsync();
                     break;
                 case "2":
-                    if (!GarantirPaths()) break;
-                    _directoryView.ExecuteDirectoryCreation(_paths!);
+                    if (!EnsurePaths()) break;
+                    _directoryView.ExecuteAsync(_paths!);
                     Console.ReadKey();
                     break;
                 case "3":
-                    if (!GarantirPaths()) break;
+                    if (!EnsurePaths()) break;
                     await _iisView.ExecuteAsync(_paths!);
                     break;
                 case "4":
-                    if (!GarantirPaths()) break;
+                    if (!EnsurePaths()) break;
                     await _msiView.ExecuteAsync(_paths!);
                     break;
 
                 case "0":
-                    MostrarSaida();
+                    ShowExitMessage();
                     return;
                 default:
                     Console.ForegroundColor = ConsoleColor.Red;
@@ -49,7 +49,7 @@ public class MainMenuView
         }
     }
     
-    private void MostrarMenu()
+    private void ShowMenu()
     {
         Console.Clear();
         Console.ForegroundColor = ConsoleColor.Cyan;
@@ -67,13 +67,13 @@ public class MainMenuView
         Console.Write(" Escolha uma opção: ");
     }
 
-    private void MostrarSaida()
+    private void ShowExitMessage()
     {
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine("\n Encerrando instalador. Até logo!");
         Console.ResetColor();
     }
-    private bool GarantirPaths()
+    private bool EnsurePaths()
     {
         if (_paths != null) return true;
 
