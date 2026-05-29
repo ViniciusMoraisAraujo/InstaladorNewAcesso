@@ -1,20 +1,20 @@
 ﻿using InstaladorNewAcesso.Configurations;
-using InstaladorNewAcesso.Implementations;
+using InstaladorNewAcesso.Factories;
 
 
 namespace InstaladorNewAcesso.Views;
 
 public class ResourceView
 {
-    public async Task ExecuteInstallAsync()
+    public async Task ExecuteAsync()
     {
-        MostrarCabecalho();
+        ShowHeader();
         var installer = InstallerFactory.Create();
-        string? sxsPath = ObterCaminhoSxsPorMenu();
+        string? sxsPath = GetSxsPathFromMenu();
 
         if (sxsPath == "SAIR") { /* ... */ return; }
 
-        MostrarCarregamentoInicial();
+        ShowInitialLoading();
 
         var setup = new FeatureSetup();
 
@@ -56,9 +56,9 @@ public class ResourceView
             Console.ResetColor();
         }
 
-        MostrarFimEtapa();
+        ShowStepFinished();
     }
-    private void MostrarCabecalho()
+    private void ShowHeader()
     {
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine("==================================================");
@@ -68,7 +68,7 @@ public class ResourceView
         Console.WriteLine();
     }
 
-    private void MostrarCarregamentoInicial()
+    private void ShowInitialLoading()
     {
         Console.ForegroundColor = ConsoleColor.Magenta;
         Console.WriteLine("\n Carregando Recursos do Sistema...");
@@ -76,7 +76,7 @@ public class ResourceView
         Console.WriteLine(new string('-', 50));
     }
 
-    private string? ObterCaminhoSxsPorMenu()
+    private string? GetSxsPathFromMenu()
     {
         Console.WriteLine("Deseja realizar a instalação online ou offline?");
         Console.WriteLine("[1] Online (Padrão - Requer Internet)");
@@ -112,7 +112,7 @@ public class ResourceView
         return sxsPath;
     }
 
-    private void MostrarFimEtapa()
+    private void ShowStepFinished()
     {
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine("\n==================================================");
