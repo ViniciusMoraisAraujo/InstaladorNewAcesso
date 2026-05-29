@@ -36,7 +36,12 @@ public class FeatureSetup
             new("Windows PowerShell 2.0 Engine", "PowerShell-V2", "MicrosoftWindowsPowerShellV2"),
             new("Cliente Telnet", "Telnet-Client", "TelnetClient"),
             new("Cliente TFTP", "TFTP-Client", "TFTP"),
-            new("Serviços de Enfileiramento de Mensagens (MSMQ)", "MSMQ-Services", "MSMQ-Container")
+            new("Serviços de Enfileiramento de Mensagens (MSMQ)", "MSMQ-Services", "MSMQ-Container"),
+            new("Ativação de MSMQ WCF", "NET-WCF-MSMQ-Activation45", "WCF-MSMQ-Activation45"),
+            new("Modelo de Processo (WAS)", "WAS-Process-Model", "WAS-ProcessModel"),
+            new("Ambiente .NET 3.5 (WAS)", "WAS-NET-Environment", "WAS-NetFxEnvironment"),
+            new("APIs de Configuração (WAS)", "WAS-Config-APIs", "WAS-ConfigurationAPI"),
+            new("Servidor Telnet", "Telnet-Server", "TelnetServer")
         };
     }
 }
