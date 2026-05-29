@@ -8,4 +8,6 @@ public class MsiInstallationModel
     public string? SiteName { get; set; }
     public string? AppPoolName { get; set; }
     public string? ExtraArgs { get; set; }
+    
+    public Dictionary<string, string> FilesToCopy { get; set; } = [];
 }
