@@ -13,7 +13,7 @@ public class InstallationPaths
     public string WebAppDS => Path.Combine(NewAcessoRoot, "WebAppDS");
     public string WebAppUI => Path.Combine(NewAcessoRoot, "WebAppUI");
     public string Win => Path.Combine(NewAcessoRoot, "Win");
-    public string Fabricantes => Path.Combine(Controller, "Fabricantes");
+    public string Manufacturers => Path.Combine(Controller, "Fabricantes");
     public InstallationPaths(string basePath)
     {
         BasePath = basePath;
