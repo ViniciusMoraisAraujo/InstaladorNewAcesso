@@ -1,8 +1,9 @@
 ﻿using System.Runtime.InteropServices;
+using InstaladorNewAcesso.Implementations;
 using InstaladorNewAcesso.Interfaces;
 using Microsoft.Win32;
 
-namespace InstaladorNewAcesso.Implementations;
+namespace InstaladorNewAcesso.Factories;
 
 public static class InstallerFactory
 {
