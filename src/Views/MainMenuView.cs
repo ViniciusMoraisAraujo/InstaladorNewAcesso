@@ -7,7 +7,7 @@ public class MainMenuView
     private readonly ResourceView _resourceView = new();
     private readonly DirectoryView _directoryView = new();
     private readonly IisView _iisView = new();
-    //private readonly MsiInstallationView _msiView = new();
+    private readonly MsiView _msiView = new();
     private InstallationPaths? _paths;
 
     public async Task ExecuteAsync()
@@ -31,10 +31,10 @@ public class MainMenuView
                     if (!EnsurePaths()) break;
                     await _iisView.ExecuteAsync(_paths!);
                     break;
-                // case "4":
-                //     if (!EnsurePaths()) break;
-                //     await _msiView.ExecuteAsync(_paths!);
-                //     break;
+                case "4":
+                if (!EnsurePaths()) break;
+                    await _msiView.ExecuteAsync(_paths!);
+                    break;
 
                 case "0":
                     ShowExitMessage();
