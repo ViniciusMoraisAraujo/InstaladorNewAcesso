@@ -9,7 +9,8 @@ public class MsiInstaller
     {
         try
         {
-            Directory.CreateDirectory(model.TargetDirectory);
+            if (!Directory.Exists(model.TargetDirectory))
+                Directory.CreateDirectory(model.TargetDirectory);
 
             string args = $"/i \"{model.MsiPath}\" /qn TARGETDIR=\"{model.TargetDirectory}\"";
             return await RunMsiexecAsync(args);

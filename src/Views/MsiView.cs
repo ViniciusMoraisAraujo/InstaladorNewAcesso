@@ -1,5 +1,6 @@
 ﻿using InstaladorNewAcesso.Models;
 using InstaladorNewAcesso.Services;
+using InstaladorNewAcesso.Utils;
 
 namespace InstaladorNewAcesso.Views;
 
@@ -7,8 +8,8 @@ public class MsiView
 {
     private readonly MsiInstaller _installer = new();
     private List<MsiInstallationModel> _todosMsi = new();
-    private List<MsiInstallationModel> _outros = new();
-    private List<MsiInstallationModel> _fabricantes = new();
+    private readonly List<MsiInstallationModel> _outros = new();
+    private readonly List<MsiInstallationModel> _fabricantes = new();
 
     public async Task ExecuteAsync(InstallationPaths paths)
     {
@@ -47,10 +48,10 @@ public class MsiView
             }
         }
 
-        Console.Write(" Banco de dados (SQLServer/Oracle): ");
-        var dbChoice = Console.ReadLine()?.Trim() ?? "SQLServer";
-
-        // --- Escaneamento ---
+        Console.Write(" Banco de dados ([1]SQLServer/[2]Oracle): ");
+        var input = Console.ReadLine()?.Trim();
+        var dbChoice = (input == "2") ? "Oracle" : "SQLServer";
+        
         var scanner = new MsiScanner(paths, dbChoice, msiRoot);
         Console.Write("\n Escaneando MSIs".PadRight(30) + "... ");
         try
@@ -77,9 +78,8 @@ public class MsiView
         }
         else
         {
-            SepararMsIs(paths.NewAcessoRoot);
+            SepararMsIs(paths);
 
-            // 1. MSIs gerais
             if (_outros.Count > 0)
             {
                 Console.ForegroundColor = ConsoleColor.Cyan;
@@ -96,7 +96,6 @@ public class MsiView
                 }
             }
 
-            // 2. Fabricantes
             if (_fabricantes.Count > 0)
             {
                 await TelaFabricantesAsync();
@@ -112,9 +111,9 @@ public class MsiView
         ShowFinishedMessage();
     }
 
-    private void SepararMsIs(string root)
+    private void SepararMsIs(InstallationPaths paths)
     {
-        string fabricantesPath = Path.Combine(root, "Fabricantes");
+        string fabricantesPath = Path.Combine(paths.Controller, "Fabricantes");
         foreach (var msi in _todosMsi)
         {
             if (msi.TargetDirectory.StartsWith(fabricantesPath, StringComparison.OrdinalIgnoreCase))
@@ -136,7 +135,6 @@ public class MsiView
         Console.WriteLine("\n " + _fabricantes.Count + " MSI(s) de fabricantes encontrados:\n");
         for (int i = 0; i < _fabricantes.Count; i++)
         {
-            // Uso explícito de string para evitar ambiguidade Path.GetFileName
             string nome = Path.GetFileName(_fabricantes[i].MsiPath) ?? "";
             string linha = string.Format("  {0,2}. {1,-50} -> {2}", i + 1, nome, _fabricantes[i].TargetDirectory);
             Console.WriteLine(linha);
