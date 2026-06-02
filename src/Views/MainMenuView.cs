@@ -22,18 +22,26 @@ public class MainMenuView
                 case "1":
                     await _resourceView.ExecuteAsync();
                     break;
+                
                 case "2":
                     if (!EnsurePaths()) break;
                     _directoryView.ExecuteAsync(_paths!);
                     Console.ReadKey();
                     break;
+                
                 case "3":
                     if (!EnsurePaths()) break;
                     await _iisView.ExecuteAsync(_paths!);
                     break;
+                
                 case "4":
                 if (!EnsurePaths()) break;
                     await _msiView.ExecuteAsync(_paths!);
+                    break;
+                
+                case "5":
+                    if (!EnsurePaths()) break;
+                    await new WebAppView().ExecuteAsync(_paths!);
                     break;
 
                 case "0":
@@ -62,6 +70,7 @@ public class MainMenuView
         Console.WriteLine(" [2] Criar Diretórios");
         Console.WriteLine(" [3] Configurar IIS");
         Console.WriteLine(" [4] Instalar Aplicações (MSIs)");
+        Console.WriteLine(" [5] Instalar WebApps (UI e DS)");
         Console.WriteLine(" [0] Sair");
         Console.WriteLine();
         Console.Write(" Escolha uma opção: ");
