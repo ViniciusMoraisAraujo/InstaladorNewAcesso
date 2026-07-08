@@ -1,5 +1,7 @@
-﻿using InstaladorNewAcesso.Configurations;
+using InstaladorNewAcesso.Configurations;
 using InstaladorNewAcesso.Models;
+using InstaladorNewAcesso.Utils;
+using Spectre.Console;
 
 namespace InstaladorNewAcesso.Views;
 
@@ -8,32 +10,29 @@ public class DirectoryView
     public void ExecuteAsync(InstallationPaths basePath)
     {
         var setup = new DirectorySetup();
-        
-        Console.ForegroundColor = ConsoleColor.Magenta;
-        Console.WriteLine("\n Criando estrutura de diretórios...");
-        Console.ResetColor();
-        Console.WriteLine(new string('-', 50));
+
+        AnsiConsole.Write(new Rule("[magenta]Criando estrutura de diretórios...[/]") { Style = Style.Parse("magenta") });
+        AnsiConsole.WriteLine();
+
+        var resultadosDaEtapa = new List<SummaryResult>();
 
         foreach (var path in setup.GetAllPaths(basePath))
         {
             if (Directory.Exists(path))
             {
-                Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine($" [IGNORADO] {path}");
+                AnsiConsole.MarkupLine($" [cyan][IGNORADO][/] {path}");
+                resultadosDaEtapa.Add(SummaryStore.Add("Diretórios", path, true, "Já existe"));
             }
             else
             {
                 Directory.CreateDirectory(path);
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine($" [CRIADO]   {path}");
+                AnsiConsole.MarkupLine($" [green][CRIADO][/]   {path}");
+                resultadosDaEtapa.Add(SummaryStore.Add("Diretórios", path, true, "Criado"));
             }
-            Console.ResetColor();
         }
 
-        Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("\n==================================================");
-        Console.WriteLine("      Fim da etapa de Diretórios.                 ");
-        Console.WriteLine("==================================================");
-        Console.ResetColor();
+        AnsiConsole.WriteLine();
+        SummaryPanelView.ExibirEtapa("Diretórios", "📂", resultadosDaEtapa);
+        AnsiConsole.Write(new Rule("[cyan]Fim da etapa de Diretórios[/]") { Style = Style.Parse("cyan") });
     }
 }

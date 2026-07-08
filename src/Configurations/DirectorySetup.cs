@@ -18,7 +18,6 @@ public class DirectorySetup
 
         foreach (var (parent, children) in FoldersWithChildren)
         {
-            yield return Path.Combine(paths.NewAcessoRoot, parent);
             foreach (var child in children)
                 yield return Path.Combine(paths.NewAcessoRoot, parent, child);
         }

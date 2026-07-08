@@ -6,4 +6,5 @@ public interface IIisInstaller
     Task<bool> CreateSiteAsync(string name, string poolName, string physicalPath, int port);
     Task<bool> SiteExistsAsync(string name);
     Task<bool> AppPoolExistsAsync(string name);
+    Task<bool> UpdateSitePhysicalPathAsync(string siteName, string newPhysicalPath);
 }

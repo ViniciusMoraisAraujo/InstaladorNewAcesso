@@ -1,5 +1,7 @@
 ﻿using System.Diagnostics;
 using InstaladorNewAcesso.Models;
+using InstaladorNewAcesso.Utils;
+using Spectre.Console;
 
 namespace InstaladorNewAcesso.Services;
 
@@ -12,8 +14,33 @@ public class MsiInstaller
             if (!Directory.Exists(model.TargetDirectory))
                 Directory.CreateDirectory(model.TargetDirectory);
 
-            string args = $"/i \"{model.MsiPath}\" /qn TARGETDIR=\"{model.TargetDirectory}\"";
-            return await RunMsiexecAsync(args);
+            string logArg = "";
+            string? logPath = null;
+            if (model.GenerateLog)
+            {
+                logPath = MsiLogHelper.GenerateLogFilePath(model.MsiPath);
+                logArg = $" /lvx* \"{logPath}\"";
+                AnsiConsole.MarkupLine($"   [gray][LOG] Log verbose: {logPath.EscapeMarkup()}[/]");
+            }
+
+            string args = $"/i \"{model.MsiPath}\" /qn TARGETDIR=\"{model.TargetDirectory}\"{logArg}";
+            bool success = await RunMsiexecAsync(args);
+
+            if (!success && model.GenerateLog && logPath != null)
+                AnalisarLogFalha(logPath);
+
+            if (success)
+            {
+                ConnectionRecordConfigHelper.UpdateConfigAfterInstall(model.TargetDirectory);
+                ControleAcessoConfigHelper.UpdateIniAfterInstall(model.TargetDirectory);
+                ControleAcessoAgendamentoHelper.UpdateAgendamentoAfterInstall(model.TargetDirectory);
+                CoreWsConfigHelper.UpdateConfigsAfterInstall(model.TargetDirectory);
+                TaskConfigHelper.UpdateConfigAfterInstall(model.TargetDirectory);
+                StandAloneExConfigHelper.UpdateConfigAfterInstall(model.TargetDirectory);
+                StandAloneImConfigHelper.UpdateConfigAfterInstall(model.TargetDirectory);
+            }
+
+            return success;
         }
         catch
         {
@@ -40,5 +67,10 @@ public class MsiInstaller
         await process.WaitForExitAsync();
 
         return process.ExitCode == 0;
+    }
+
+    private static void AnalisarLogFalha(string logPath)
+    {
+        MsiLogHelper.DisplayLogAnalysis(logPath);
     }
 }

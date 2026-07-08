@@ -6,10 +6,20 @@ namespace InstaladorNewAcesso.Implementations;
 
 public class WindowsServerInstaller : IFeatureInstaller
 {
+    private readonly IProcessExecutor _executor;
+
+    public WindowsServerInstaller() : this(new ProcessExecutorService()) { }
+
+    public WindowsServerInstaller(IProcessExecutor executor)
+    {
+        _executor = executor;
+    }
+
+
     public async Task<bool> IsFeatureInstalledAsync(WindowsFeature feature)
     {
         var arguments = $"-Command \"(Get-WindowsFeature -Name {feature.ServerName}).Installed\"";
-        var output = await ProcessExecutor.RunPowerShellWithOutputAsync(arguments);
+        var output = await _executor.RunPowerShellWithOutputAsync(arguments);
         
         return output.Trim().Equals("True", StringComparison.OrdinalIgnoreCase);
     }
@@ -22,6 +32,6 @@ public class WindowsServerInstaller : IFeatureInstaller
 
         var command = $"Install-WindowsFeature -Name {feature.ServerName}{offlineArgs}";       
         
-        return await ProcessExecutor.RunPowerShellCommandAsync(command, feature.FriendlyName);
+        return await _executor.RunPowerShellCommandAsync(command, feature.FriendlyName);
     }
 }

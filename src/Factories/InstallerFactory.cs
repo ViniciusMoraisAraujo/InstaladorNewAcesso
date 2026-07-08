@@ -2,6 +2,7 @@
 using InstaladorNewAcesso.Implementations;
 using InstaladorNewAcesso.Interfaces;
 using Microsoft.Win32;
+using Spectre.Console;
 
 namespace InstaladorNewAcesso.Factories;
 
@@ -16,11 +17,11 @@ public static class InstallerFactory
 
         if (IsWindowsServer())
         {
-            Console.WriteLine("AMBIENTE: WINDOWS SERVER (ServerManage)");
+            AnsiConsole.MarkupLine("[cyan]AMBIENTE:[/] [green]WINDOWS SERVER (ServerManage)[/]");
             return new WindowsServerInstaller();
         }
 
-        Console.WriteLine("AMBIENTE: WINDOWS DESKTOP (DISM)");
+        AnsiConsole.MarkupLine("[cyan]AMBIENTE:[/] [green]WINDOWS DESKTOP (DISM)[/]");
         return new WindowsDesktopInstaller();
     }
 

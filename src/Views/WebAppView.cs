@@ -1,6 +1,7 @@
-﻿using InstaladorNewAcesso.Models;
+using InstaladorNewAcesso.Models;
 using InstaladorNewAcesso.Services;
 using InstaladorNewAcesso.Utils;
+using Spectre.Console;
 
 namespace InstaladorNewAcesso.Views;
 
@@ -11,115 +12,111 @@ public class WebAppView
 
     public async Task ExecuteAsync(InstallationPaths paths)
     {
-        ShowHeader();
+        AnsiConsole.Write(new Rule("[cyan]INSTALAÇÃO DE WEB APPS[/]") { Style = Style.Parse("cyan") });
+        AnsiConsole.WriteLine();
 
-        Console.Write("\n Diretório raiz dos instaladores WEBApp ou ENTER para usar o padrão: ");
-        var msiRootInput = Console.ReadLine()?.Trim();
+        var msiRoot = AnsiConsole.Prompt(
+            new TextPrompt<string>("[bold yellow]Diretório raiz dos instaladores WEBApp[/] ([gray]ENTER para usar o padrão[/]):")
+                .AllowEmpty());
 
-        string msiRoot;
-        if (string.IsNullOrWhiteSpace(msiRootInput))
+        if (string.IsNullOrWhiteSpace(msiRoot))
         {
             msiRoot = Path.Combine(paths.InstallationPath, "PrimeAcesso V5.9");
-            Console.ForegroundColor = ConsoleColor.DarkGray;
-            Console.WriteLine(" Usando diretório padrão: " + msiRoot);
-            Console.ResetColor();
-
-            if (!Directory.Exists(msiRoot))
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("\n [ERRO] Diretório padrão não encontrado: " + msiRoot);
-                Console.ResetColor();
-                Console.ReadKey();
-                return;
-            }
+            AnsiConsole.MarkupLine($" [gray]Usando diretório padrão: {msiRoot.EscapeMarkup()}[/]");
         }
-        else
+
+        if (!Directory.Exists(msiRoot))
         {
-            msiRoot = msiRootInput;
-            if (!Directory.Exists(msiRoot))
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("\n [ERRO] Diretório informado não encontrado.");
-                Console.ResetColor();
-                Console.ReadKey();
-                return;
-            }
+            AnsiConsole.MarkupLine($"[red][ERRO] Diretório não encontrado: {msiRoot.EscapeMarkup()}[/]");
+            AnsiConsole.Ask<string>("[gray]Pressione ENTER para continuar...[/]");
+            return;
         }
 
-        Console.Write(" Banco de dados ([1]SQLServer/[2]Oracle): ");
-        var input = Console.ReadLine()?.Trim();
-        var dbChoice = (input == "2") ? "Oracle" : "SQLServer";
+        var dbChoice = AnsiConsole.Prompt(
+            new SelectionPrompt<string>()
+                .Title("[bold yellow]Banco de dados:[/]")
+                .AddChoices(["SQLServer", "Oracle"]));
 
         var scanner = new WebAppScanner(paths, dbChoice, msiRoot);
-        Console.Write("\n Escaneando Web Apps".PadRight(30) + "... ");
+        AnsiConsole.Markup("\n Escaneando Web Apps... ");
         _webApps = scanner.Scan();
-        
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"[{_webApps.Count} ENCONTRADOS]");
-        Console.ResetColor();
+
+        AnsiConsole.MarkupLine($"[green][{_webApps.Count} ENCONTRADOS][/]");
 
         if (_webApps.Count == 0)
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("\n Nenhum Web App encontrado (WebAppUI/WebAppDS).");
-            Console.ResetColor();
+            AnsiConsole.MarkupLine("\n[yellow]Nenhum Web App encontrado (WebAppUI/WebAppDS).[/]");
         }
         else
         {
-            Console.WriteLine("\n Web Apps encontrados:\n");
+            var table = new Table()
+                .Border(TableBorder.Rounded)
+                .AddColumn(new TableColumn("[yellow]MSI[/]"))
+                .AddColumn(new TableColumn("[yellow]Site[/]"))
+                .AddColumn(new TableColumn("[yellow]Porta[/]"))
+                .AddColumn(new TableColumn("[yellow]Destino[/]"));
+
             foreach (var app in _webApps)
             {
                 string nome = Path.GetFileName(app.MsiPath);
-                Console.WriteLine($"  • {nome}");
-                Console.WriteLine($"    Site: {app.SiteName} | AppPool: {app.AppPoolName} | Porta: {app.Port}");
-                Console.WriteLine($"    Origem (forçada): {app.ForcedInstallPath}");
-                Console.WriteLine($"    Destino: {app.TargetDirectory}\n");
+                table.AddRow(
+                    nome.EscapeMarkup(),
+                    app.SiteName.EscapeMarkup(),
+                    app.Port.ToString(),
+                    app.TargetDirectory.EscapeMarkup());
             }
 
-            Console.Write(" Deseja instalar os Web Apps? (S/N): ");
-            if (Console.ReadLine()?.Trim().ToUpper() == "S")
+            AnsiConsole.Write(table);
+
+            var generateLog = AnsiConsole.Confirm("\n[bold yellow]Gerar log verbose da instalação para diagnóstico?[/]", false);
+            if (generateLog)
             {
-                await InstallAllAsync();
+                AnsiConsole.MarkupLine($" [gray]Os logs serão salvos em: {MsiLogHelper.GetLogDirectory().EscapeMarkup()}[/]");
+            }
+
+            foreach (var app in _webApps)
+                app.GenerateLog = generateLog;
+
+            if (AnsiConsole.Confirm("\n[bold yellow]Deseja instalar os Web Apps?[/]"))
+            {
+                await InstallAllAsync(paths);
             }
             else
             {
-                Console.WriteLine(" Instalação cancelada.");
+                AnsiConsole.MarkupLine("[gray]Instalação cancelada.[/]");
             }
         }
 
-        ShowFinishedMessage();
+        AnsiConsole.WriteLine();
+        AnsiConsole.Write(new Rule("[cyan]Fim da etapa de Instalação de Web Apps[/]") { Style = Style.Parse("cyan") });
+        AnsiConsole.Ask<string>("[gray]Pressione ENTER para continuar...[/]");
     }
 
-    private async Task InstallAllAsync()
+    private async Task InstallAllAsync(InstallationPaths paths)
     {
+        var resultadosDaEtapa = new List<SummaryResult>();
         int sucessos = 0;
+
         foreach (var app in _webApps)
         {
-            bool ok = await _installer.InstallAsync(app);
-            if (ok) sucessos++;
+            AnsiConsole.Markup($"\n [{app.SiteName.EscapeMarkup()}] Instalando... ");
+            bool ok = await _installer.InstallAsync(app, paths);
+
+            if (ok)
+            {
+                AnsiConsole.MarkupLine("[green][OK][/]");
+                resultadosDaEtapa.Add(SummaryStore.Add("WebApps", $"{app.SiteName} (porta {app.Port})", true, $"Instalado em {app.TargetDirectory}"));
+                sucessos++;
+            }
+            else
+            {
+                AnsiConsole.MarkupLine("[red][FALHA][/]");
+                resultadosDaEtapa.Add(SummaryStore.Add("WebApps", $"{app.SiteName} (porta {app.Port})", false, "Falha na instalação"));
+            }
         }
 
-        Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine($"\n Instalação concluída. {sucessos}/{_webApps.Count} Web Apps instalados.");
-        Console.ResetColor();
-    }
-
-    private void ShowHeader()
-    {
-        Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("==================================================");
-        Console.WriteLine("          INSTALAÇÃO DE WEB APPS                  ");
-        Console.WriteLine("==================================================");
-        Console.ResetColor();
-    }
-
-    private void ShowFinishedMessage()
-    {
-        Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("\n==================================================");
-        Console.WriteLine("      Fim da etapa de Instalação de Web Apps.     ");
-        Console.WriteLine("==================================================");
-        Console.ResetColor();
-        Console.ReadKey();
+        AnsiConsole.WriteLine();
+        SummaryPanelView.ExibirEtapa("WebApps", "🌍", resultadosDaEtapa);
+        AnsiConsole.MarkupLine($"\n[cyan]Instalação concluída. {sucessos}/{_webApps.Count} Web Apps instalados.[/]");
     }
 }

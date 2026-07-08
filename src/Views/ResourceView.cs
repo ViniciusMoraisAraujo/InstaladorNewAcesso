@@ -1,6 +1,8 @@
-﻿using InstaladorNewAcesso.Configurations;
+using InstaladorNewAcesso.Configurations;
 using InstaladorNewAcesso.Factories;
-
+using InstaladorNewAcesso.Models;
+using InstaladorNewAcesso.Utils;
+using Spectre.Console;
 
 namespace InstaladorNewAcesso.Views;
 
@@ -8,117 +10,100 @@ public class ResourceView
 {
     public async Task ExecuteAsync()
     {
-        ShowHeader();
+        AnsiConsole.Write(new Rule("[cyan]INSTALADOR NEW ACESSO: RECURSOS DO WINDOWS[/]") { Style = Style.Parse("cyan") });
+        AnsiConsole.WriteLine();
+
         var installer = InstallerFactory.Create();
         string? sxsPath = GetSxsPathFromMenu();
 
-        if (sxsPath == "SAIR") { /* ... */ return; }
+        if (sxsPath == "SAIR") return;
 
-        ShowInitialLoading();
-
-        var setup = new FeatureSetup();
-
-        Console.WriteLine("\n Verificando recursos instalados...");
-        var checkTasks = setup.Features
-            .Select(async feature => new
+        await AnsiConsole.Status()
+            .StartAsync("Carregando Recursos do Sistema...", async ctx =>
             {
-                Feature = feature,
-                IsInstalled = await installer.IsFeatureInstalledAsync(feature)
+                var setup = new FeatureSetup();
+
+                ctx.Status = "Verificando recursos instalados...";
+                var checkTasks = setup.Features
+                    .Select(async feature => new
+                    {
+                        Feature = feature,
+                        IsInstalled = await installer.IsFeatureInstalledAsync(feature)
+                    });
+
+                var results = await Task.WhenAll(checkTasks);
+
+                var toInstall = results
+                    .Where(r => !r.IsInstalled)
+                    .Select(r => r.Feature)
+                    .ToList();
+
+                var resultadosDaEtapa = new List<SummaryResult>();
+
+                foreach (var installed in results.Where(r => r.IsInstalled))
+                {
+                    AnsiConsole.MarkupLine($" [cyan]{installed.Feature.FriendlyName.EscapeMarkup().PadRight(30)} [gray][IGNORADO][/][/]");
+                    resultadosDaEtapa.Add(SummaryStore.Add("Recursos do Windows", installed.Feature.FriendlyName, true, "Já instalado"));
+                }
+
+                AnsiConsole.MarkupLine($"\n [gray]{results.Count(r => r.IsInstalled)} já instalados. {toInstall.Count} para instalar.[/]");
+
+                foreach (var feature in toInstall)
+                {
+                    ctx.Status = $"Instalando: {feature.FriendlyName}...";
+                    AnsiConsole.Markup($"\n [yellow]Instalando:[/] {feature.FriendlyName.EscapeMarkup().PadRight(30)}... ");
+
+                    bool sucesso = await installer.InstallFeatureAsync(feature, sxsPath);
+
+                    if (sucesso)
+                    {
+                        AnsiConsole.MarkupLine("[green][SUCESSO][/]");
+                        resultadosDaEtapa.Add(SummaryStore.Add("Recursos do Windows", feature.FriendlyName, true, "Instalado"));
+                    }
+                    else
+                    {
+                        AnsiConsole.MarkupLine("[red][FALHA][/]");
+                        resultadosDaEtapa.Add(SummaryStore.Add("Recursos do Windows", feature.FriendlyName, false, "Falha na instalação"));
+                    }
+                }
+
+                AnsiConsole.WriteLine();
+                SummaryPanelView.ExibirEtapa("Recursos do Windows", "🌐", resultadosDaEtapa);
             });
 
-        var results = await Task.WhenAll(checkTasks);
-
-        var toInstall = results
-            .Where(r => !r.IsInstalled)
-            .Select(r => r.Feature)
-            .ToList();
-
-        foreach (var installed in results.Where(r => r.IsInstalled))
-        {
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine($"\n {installed.Feature.FriendlyName.PadRight(30)} [IGNORADO]");
-            Console.ResetColor();
-        }
-
-        Console.WriteLine($"\n {results.Count(r => r.IsInstalled)} já instalados. {toInstall.Count} para instalar.");
-
-        foreach (var feature in toInstall)
-        {
-            Console.Write($"\n Instalando: {feature.FriendlyName.PadRight(30)}... ");
-            Console.ForegroundColor = ConsoleColor.Blue;
-            Console.WriteLine("[INSTALANDO]");
-            Console.ResetColor();
-
-            bool sucesso = await installer.InstallFeatureAsync(feature, sxsPath);
-
-            Console.ForegroundColor = sucesso ? ConsoleColor.Green : ConsoleColor.Red;
-            Console.WriteLine(sucesso ? "-> [SUCESSO]" : "-> [FALHA]");
-            Console.ResetColor();
-        }
-
-        ShowStepFinished();
-    }
-    private void ShowHeader()
-    {
-        Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("==================================================");
-        Console.WriteLine("   INSTALADOR NEW ACESSO: RECURSOS DO WINDOWS   ");
-        Console.WriteLine("==================================================");
-        Console.ResetColor();
-        Console.WriteLine();
-    }
-
-    private void ShowInitialLoading()
-    {
-        Console.ForegroundColor = ConsoleColor.Magenta;
-        Console.WriteLine("\n Carregando Recursos do Sistema...");
-        Console.ResetColor();
-        Console.WriteLine(new string('-', 50));
+        AnsiConsole.WriteLine();
+        AnsiConsole.Write(new Rule("[cyan]Fim da etapa de Recursos do Windows[/]") { Style = Style.Parse("cyan") });
+        AnsiConsole.Ask<string>("[gray]Pressione ENTER para continuar...[/]");
     }
 
     private string? GetSxsPathFromMenu()
     {
-        Console.WriteLine("Deseja realizar a instalação online ou offline?");
-        Console.WriteLine("[1] Online (Padrão - Requer Internet)");
-        Console.WriteLine("[2] Offline (Utilizando pasta sxs/mídia do Windows)");
-        Console.Write("\nEscolha uma opção: ");
+        var opcao = AnsiConsole.Prompt(
+            new SelectionPrompt<string>()
+                .Title("Deseja realizar a instalação online ou offline?")
+                .AddChoices([
+                    "Online (Padrão - Requer Internet)",
+                    "Offline (Utilizando pasta sxs/mídia do Windows)"
+                ]));
 
-        string opcao = Console.ReadLine() ?? "1";
-        string? sxsPath = null;
-
-        if (opcao == "2")
+        if (opcao.StartsWith("Offline"))
         {
-            Console.Write("\nDigite o caminho completo da pasta sxs (Ex: D:\\sources\\sxs) ou digite '2' para sair: ");
-            sxsPath = Console.ReadLine();
-    
-            if (sxsPath == "2") return "SAIR"; 
-
-            while (string.IsNullOrWhiteSpace(sxsPath) || !Directory.Exists(sxsPath))
+            while (true)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("Caminho inválido ou inacessível.");
-                Console.ResetColor();
-        
-                Console.WriteLine("Digite o caminho da pasta sxs ou digite '2' para sair: ");
-                sxsPath = Console.ReadLine();
+                var sxsPath = AnsiConsole.Ask<string>(
+                    "\n[bold yellow]Digite o caminho completo da pasta sxs[/] ([gray]Ex: D:\\sources\\sxs[/]):\n" +
+                    "Digite '2' para sair ou '3' para voltar ao Online:");
 
-                if (sxsPath == "2")
-                {
-                    break; 
-                }
+                if (sxsPath == "2") return "SAIR";
+                if (sxsPath == "3") return null;
+
+                if (!string.IsNullOrWhiteSpace(sxsPath) && Directory.Exists(sxsPath))
+                    return sxsPath;
+
+                AnsiConsole.MarkupLine("[red]Caminho inválido ou inacessível.[/]");
             }
         }
 
-        return sxsPath;
-    }
-
-    private void ShowStepFinished()
-    {
-        Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("\n==================================================");
-        Console.WriteLine("      Fim da etapa de Recursos do Windows.        ");
-        Console.WriteLine("==================================================");
-        Console.ResetColor();
-        Console.ReadKey();
+        return null;
     }
 }

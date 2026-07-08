@@ -6,10 +6,19 @@ public class WebAppModel
     public string SiteName { get; set; } = string.Empty;
     public string AppPoolName { get; set; } = string.Empty;
 
-    [Obsolete("Não utilizado na estratégia atual. A DLL MSVBDPCADLL instala no physicalPath do IIS.")]
+    /// <summary>
+    /// Caminho onde o MSI realmente instala os arquivos (via Custom Action MSVBDPCADLL).
+    /// A DLL MSVBDPCADLL ignora TARGETDIR e usa o physicalPath do IIS.
+    /// </summary>
     public string ForcedInstallPath { get; set; } = string.Empty;
     
     public string TargetDirectory { get; set; } = string.Empty;
 
     public int Port { get; set; }
+
+    /// <summary>
+    /// Quando true, gera um log verbose (/lvx*) da instalação para diagnóstico.
+    /// O log é salvo em %TEMP%\InstaladorNewAcesso\Logs\
+    /// </summary>
+    public bool GenerateLog { get; set; }
 }

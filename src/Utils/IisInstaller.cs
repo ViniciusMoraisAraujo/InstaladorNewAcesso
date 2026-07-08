@@ -4,6 +4,16 @@ namespace InstaladorNewAcesso.Utils;
 
 public class IisInstaller : IIisInstaller
 {
+    private readonly IProcessExecutor _executor;
+
+    public IisInstaller() : this(new ProcessExecutorService()) { }
+
+    public IisInstaller(IProcessExecutor executor)
+    {
+        _executor = executor;
+    }
+
+
     public async Task<bool> CreateApplicationPoolAsync(string name, string runtimeVersion, string pipelineMode)
     {
         var command = $"""
@@ -15,7 +25,7 @@ public class IisInstaller : IIisInstaller
                        "
                        """;
 
-        return await ProcessExecutor.RunPowerShellCommandAsync(command, $"AppPool: {name}");
+        return await _executor.RunPowerShellCommandAsync(command, $"AppPool: {name}");
     }
 
     public async Task<bool> CreateSiteAsync(string name, string poolName, string physicalPath, int port)
@@ -27,12 +37,12 @@ public class IisInstaller : IIisInstaller
                        "
                        """;
 
-        return await ProcessExecutor.RunPowerShellCommandAsync(command, $"Site: {name}");
+        return await _executor.RunPowerShellCommandAsync(command, $"Site: {name}");
     }
 
     public async Task<bool> SiteExistsAsync(string name)
     {
-        var output = await ProcessExecutor.RunPowerShellWithOutputAsync(
+        var output = await _executor.RunPowerShellWithOutputAsync(
             $"-Command \"Import-Module WebAdministration; Test-Path 'IIS:\\Sites\\{name}'\"");
         return output.Trim().Equals("True", StringComparison.OrdinalIgnoreCase);
     }
@@ -40,8 +50,20 @@ public class IisInstaller : IIisInstaller
 
     public async Task<bool> AppPoolExistsAsync(string name)
     {
-        var output = await ProcessExecutor.RunPowerShellWithOutputAsync(
+        var output = await _executor.RunPowerShellWithOutputAsync(
             $"-Command \"Import-Module WebAdministration; Test-Path 'IIS:\\AppPools\\{name}'\"");
         return output.Trim().Equals("True", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public async Task<bool> UpdateSitePhysicalPathAsync(string siteName, string newPhysicalPath)
+    {
+        var command = $"""
+                       -Command "
+                       Import-Module WebAdministration;
+                       Set-ItemProperty 'IIS:\\Sites\\{siteName}' -Name physicalPath -Value '{newPhysicalPath}'
+                       "
+                       """;
+
+        return await _executor.RunPowerShellCommandAsync(command, $"Atualizar PhysicalPath: {siteName} -> {newPhysicalPath}");
     }
 }

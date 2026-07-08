@@ -1,4 +1,5 @@
-﻿using InstaladorNewAcesso.Models;
+using InstaladorNewAcesso.Models;
+using Spectre.Console;
 
 namespace InstaladorNewAcesso.Utils;
 
@@ -24,17 +25,17 @@ public class WebAppScanner
 
         if (!Directory.Exists(_msiSourceRoot))
         {
-            Console.WriteLine($"   [DEBUG] Diretório não encontrado: {_msiSourceRoot}");
+            AnsiConsole.MarkupLine($"[gray][[DEBUG]] Diretório não encontrado: {_msiSourceRoot.EscapeMarkup()}[/]");
             return webApps;
         }
 
-        Console.WriteLine($"   [DEBUG] Escaneando: {_msiSourceRoot}");
+        AnsiConsole.MarkupLine($"[gray][[DEBUG]] Escaneando: {_msiSourceRoot.EscapeMarkup()}[/]");
 
         // Escaneia subpastas de primeiro nível
         foreach (var subDir in Directory.GetDirectories(_msiSourceRoot))
         {
             var folderName = Path.GetFileName(subDir);
-            Console.WriteLine($"   [DEBUG] Verificando pasta: {folderName}");
+            AnsiConsole.MarkupLine($"[gray][[DEBUG]] Verificando pasta: {folderName.EscapeMarkup()}[/]");
 
             bool isDbFolder =
                 folderName.Equals("SQLServer", StringComparison.OrdinalIgnoreCase) ||
@@ -44,12 +45,12 @@ public class WebAppScanner
             {
                 if (folderName.Equals(_dbChoice, StringComparison.OrdinalIgnoreCase))
                 {
-                    Console.WriteLine($"   [DEBUG] Pasta do banco '{folderName}' corresponde. Escaneando...");
+                    AnsiConsole.MarkupLine($"[gray][[DEBUG]] Pasta do banco '{folderName.EscapeMarkup()}' corresponde. Escaneando...[/]");
                     AddRange(webApps, ScanDirectory(subDir, SearchOption.AllDirectories), addedMsiPaths);
                 }
                 else
                 {
-                    Console.WriteLine($"   [DEBUG] Pasta do banco '{folderName}' ignorada (não é '{_dbChoice}')");
+                    AnsiConsole.MarkupLine($"[gray][[DEBUG]] Pasta do banco '{folderName.EscapeMarkup()}' ignorada (não é '{_dbChoice.EscapeMarkup()}')[/]");
                 }
                 continue;
             }
@@ -58,7 +59,7 @@ public class WebAppScanner
         }
 
         // Escaneia apenas a raiz (TopDirectoryOnly para não reprocessar subpastas já visitadas)
-        Console.WriteLine($"   [DEBUG] Verificando raiz...");
+        AnsiConsole.MarkupLine($"[gray][[DEBUG]] Verificando raiz...[/]");
         AddRange(webApps, ScanDirectory(_msiSourceRoot, SearchOption.TopDirectoryOnly), addedMsiPaths);
 
         return webApps;
@@ -74,7 +75,7 @@ public class WebAppScanner
             if (addedPaths.Add(model.MsiPath))
                 target.Add(model);
             else
-                Console.WriteLine($"   [DEBUG] MSI duplicado ignorado: {model.MsiPath}");
+                AnsiConsole.MarkupLine($"[gray][[DEBUG]] MSI duplicado ignorado: {model.MsiPath.EscapeMarkup()}[/]");
         }
     }
 
@@ -83,18 +84,18 @@ public class WebAppScanner
         var webApps = new List<WebAppModel>();
 
         var msiFiles = Directory.GetFiles(directory, "*.msi", searchOption);
-        Console.WriteLine($"   [DEBUG] Encontrados {msiFiles.Length} arquivos .msi em: {directory}");
+        AnsiConsole.MarkupLine($"[gray][[DEBUG]] Encontrados {msiFiles.Length} arquivos .msi em: {directory.EscapeMarkup()}[/]");
 
         foreach (var msiPath in msiFiles)
         {
             var fileName = Path.GetFileNameWithoutExtension(msiPath);
-            Console.WriteLine($"   [DEBUG] Verificando: {fileName}");
+            AnsiConsole.MarkupLine($"[gray][[DEBUG]] Verificando: {fileName.EscapeMarkup()}[/]");
 
             // Identificar WebAppDS (verificado antes de UI para evitar falso positivo
             // caso um nome contenha ambas as siglas)
             if (fileName.Contains("DS", StringComparison.OrdinalIgnoreCase))
             {
-                Console.WriteLine($"   [DEBUG] -> Detectado como WebAppDS!");
+                AnsiConsole.MarkupLine($"[gray][[DEBUG]] -> Detectado como WebAppDS![/]");
                 webApps.Add(new WebAppModel
                 {
                     MsiPath = msiPath,
@@ -108,7 +109,7 @@ public class WebAppScanner
             // Identificar WebAppUI
             else if (fileName.Contains("UI", StringComparison.OrdinalIgnoreCase))
             {
-                Console.WriteLine($"   [DEBUG] -> Detectado como WebAppUI!");
+                AnsiConsole.MarkupLine($"[gray][[DEBUG]] -> Detectado como WebAppUI![/]");
                 webApps.Add(new WebAppModel
                 {
                     MsiPath = msiPath,
@@ -121,7 +122,7 @@ public class WebAppScanner
             }
             else
             {
-                Console.WriteLine($"   [DEBUG] -> Não reconhecido como WebAppUI nem WebAppDS. Ignorado.");
+                AnsiConsole.MarkupLine($"[gray][[DEBUG]] -> Não reconhecido como WebAppUI nem WebAppDS. Ignorado.[/]");
             }
         }
 

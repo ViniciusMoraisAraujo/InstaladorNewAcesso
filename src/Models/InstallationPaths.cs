@@ -24,6 +24,7 @@ public class InstallationPaths
     public string ControllerOfflineWinServiceIn => Path.Combine(ControllerOffline, "WinService_In");
     public string WebAppDS => Path.Combine(NewAcessoRoot, "WebAppDS");
     public string WebAppUI => Path.Combine(NewAcessoRoot, "WebAppUI");
+    public string WebAppUIFabricantes => Path.Combine(WebAppUI, "Fabricantes");
     public InstallationPaths(string basePath)
     {
         BasePath = basePath;

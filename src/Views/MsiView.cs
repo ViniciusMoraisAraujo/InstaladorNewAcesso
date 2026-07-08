@@ -1,6 +1,7 @@
-﻿using InstaladorNewAcesso.Models;
+using InstaladorNewAcesso.Models;
 using InstaladorNewAcesso.Services;
 using InstaladorNewAcesso.Utils;
+using Spectre.Console;
 
 namespace InstaladorNewAcesso.Views;
 
@@ -13,86 +14,76 @@ public class MsiView
 
     public async Task ExecuteAsync(InstallationPaths paths)
     {
-        ShowHeader();
+        AnsiConsole.Write(new Rule("[cyan]INSTALAÇÃO DE APLICAÇÕES (MSIs)[/]") { Style = Style.Parse("cyan") });
+        AnsiConsole.WriteLine();
 
-        Console.Write("\n Diretório raiz dos instaladores MSI ou ENTER para usar o padrão (ex: \\Installers\\PrimeAcesso V5.9): ");
-        var msiRootInput = Console.ReadLine()?.Trim();
+        var msiRoot = AnsiConsole.Prompt(
+            new TextPrompt<string>("[bold yellow]Diretório raiz dos instaladores MSI[/] ([gray]ENTER para padrão: Installers\\PrimeAcesso V5.9[/]):")
+                .AllowEmpty()
+                .DefaultValueStyle(new Style().Foreground(Color.Grey)));
 
-        string msiRoot;
-        if (string.IsNullOrWhiteSpace(msiRootInput))
+        if (string.IsNullOrWhiteSpace(msiRoot))
         {
             msiRoot = Path.Combine(paths.InstallationPath, "PrimeAcesso V5.9");
-            Console.ForegroundColor = ConsoleColor.DarkGray;
-            Console.WriteLine(" Usando diretório padrão: " + msiRoot);
-            Console.ResetColor();
-
-            if (!Directory.Exists(msiRoot))
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("\n [ERRO] Diretório padrão não encontrado: " + msiRoot);
-                Console.ResetColor();
-                Console.ReadKey();
-                return;
-            }
-        }
-        else
-        {
-            msiRoot = msiRootInput;
-            if (!Directory.Exists(msiRoot))
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("\n [ERRO] Diretório informado não encontrado.");
-                Console.ResetColor();
-                Console.ReadKey();
-                return;
-            }
+            AnsiConsole.MarkupLine($" [gray]Usando diretório padrão: {msiRoot.EscapeMarkup()}[/]");
         }
 
-        Console.Write(" Banco de dados ([1]SQLServer/[2]Oracle): ");
-        var input = Console.ReadLine()?.Trim();
-        var dbChoice = (input == "2") ? "Oracle" : "SQLServer";
-        
-        var scanner = new MsiScanner(paths, dbChoice, msiRoot);
-        Console.Write("\n Escaneando MSIs".PadRight(30) + "... ");
-        try
+        if (!Directory.Exists(msiRoot))
         {
-            _todosMsi = scanner.Scan();
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("[" + _todosMsi.Count + " ENCONTRADOS]");
-            Console.ResetColor();
-        }
-        catch (Exception ex)
-        {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("[FALHA] " + ex.Message);
-            Console.ResetColor();
-            Console.ReadKey();
+            AnsiConsole.MarkupLine($"[red][ERRO] Diretório não encontrado: {msiRoot.EscapeMarkup()}[/]");
+            AnsiConsole.Ask<string>("[gray]Pressione ENTER para continuar...[/]");
             return;
         }
 
+        var dbChoice = AnsiConsole.Prompt(
+            new SelectionPrompt<string>()
+                .Title("[bold yellow]Banco de dados:[/]")
+                .AddChoices(["SQLServer", "Oracle"]));
+
+        var scanner = new MsiScanner(paths, dbChoice, msiRoot);
+        await AnsiConsole.Status()
+            .StartAsync("Escaneando MSIs...", async ctx =>
+            {
+                try
+                {
+                    _todosMsi = scanner.Scan();
+                    AnsiConsole.MarkupLine($" [green][{_todosMsi.Count} ENCONTRADOS][/]");
+                }
+                catch (Exception ex)
+                {
+                    AnsiConsole.MarkupLine($"[red][FALHA] {ex.Message.EscapeMarkup()}[/]");
+                    AnsiConsole.Ask<string>("[gray]Pressione ENTER para continuar...[/]");
+                    return;
+                }
+            });
+
         if (_todosMsi.Count == 0)
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("\n Nenhum MSI regular encontrado (WebApps são ignorados).");
-            Console.ResetColor();
+            AnsiConsole.MarkupLine("\n[yellow]Nenhum MSI regular encontrado (WebApps são ignorados).[/]");
         }
         else
         {
+            var generateLog = AnsiConsole.Confirm("\n[bold yellow]Gerar log verbose da instalação para diagnóstico?[/]", false);
+            if (generateLog)
+            {
+                AnsiConsole.MarkupLine($" [gray]Os logs serão salvos em: {MsiLogHelper.GetLogDirectory().EscapeMarkup()}[/]");
+            }
+
+            foreach (var msi in _todosMsi)
+                msi.GenerateLog = generateLog;
+
             SepararMsIs(paths);
 
             if (_outros.Count > 0)
             {
-                Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine("\n " + _outros.Count + " MSI(s) gerais encontrados (não fabricantes).");
-                Console.ResetColor();
-                Console.Write(" Deseja instalar todos eles? (S/N): ");
-                if (Console.ReadLine()?.Trim().ToUpper() == "S")
+                AnsiConsole.MarkupLine($"\n[cyan]{_outros.Count} MSI(s) gerais encontrados[/] (não fabricantes).");
+                if (AnsiConsole.Confirm("Deseja instalar todos eles?"))
                 {
                     await InstalarListaAsync(_outros);
                 }
                 else
                 {
-                    Console.WriteLine(" Instalação dos MSIs gerais cancelada.");
+                    AnsiConsole.MarkupLine("[gray]Instalação dos MSIs gerais cancelada.[/]");
                 }
             }
 
@@ -102,13 +93,13 @@ public class MsiView
             }
             else if (_outros.Count == 0)
             {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine("\n Nenhum MSI encontrado.");
-                Console.ResetColor();
+                AnsiConsole.MarkupLine("\n[yellow]Nenhum MSI encontrado.[/]");
             }
         }
 
-        ShowFinishedMessage();
+        AnsiConsole.WriteLine();
+        AnsiConsole.Write(new Rule("[cyan]Fim da etapa de Instalação de MSIs[/]") { Style = Style.Parse("cyan") });
+        AnsiConsole.Ask<string>("[gray]Pressione ENTER para continuar...[/]");
     }
 
     private void SepararMsIs(InstallationPaths paths)
@@ -126,35 +117,44 @@ public class MsiView
     private async Task TelaFabricantesAsync()
     {
         Console.Clear();
-        Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("==================================================");
-        Console.WriteLine("          FABRICANTES DISPONÍVEIS                 ");
-        Console.WriteLine("==================================================");
-        Console.ResetColor();
+        AnsiConsole.Write(new Rule("[cyan]FABRICANTES DISPONÍVEIS[/]") { Style = Style.Parse("cyan") });
+        AnsiConsole.WriteLine();
 
-        Console.WriteLine("\n " + _fabricantes.Count + " MSI(s) de fabricantes encontrados:\n");
+        // Tabela de fabricantes
+        var table = new Table()
+            .Border(TableBorder.Rounded)
+            .AddColumn(new TableColumn("[yellow]#[/]").Centered())
+            .AddColumn(new TableColumn("[yellow]MSI[/]"))
+            .AddColumn(new TableColumn("[yellow]Destino[/]"));
+
         for (int i = 0; i < _fabricantes.Count; i++)
         {
             string nome = Path.GetFileName(_fabricantes[i].MsiPath) ?? "";
-            string linha = string.Format("  {0,2}. {1,-50} -> {2}", i + 1, nome, _fabricantes[i].TargetDirectory);
-            Console.WriteLine(linha);
+            table.AddRow(
+                $"{i + 1}",
+                nome.EscapeMarkup(),
+                _fabricantes[i].TargetDirectory.EscapeMarkup());
         }
 
-        Console.WriteLine("\n Opções:");
-        Console.WriteLine("   T - Instalar TODOS os fabricantes");
-        Console.WriteLine("   S - Selecionar manualmente (índices separados por vírgula)");
-        Console.WriteLine("   N - Não instalar fabricantes");
-        Console.Write("\n Sua escolha: ");
-        var opcao = Console.ReadLine()?.Trim().ToUpper();
+        AnsiConsole.Write(table);
+        AnsiConsole.WriteLine();
 
-        switch (opcao)
+        var opcao = AnsiConsole.Prompt(
+            new SelectionPrompt<string>()
+                .Title("[bold yellow]Opções de instalação:[/]")
+                .AddChoices([
+                    "T - Instalar TODOS os fabricantes",
+                    "S - Selecionar manualmente",
+                    "N - Não instalar fabricantes"
+                ]));
+
+        switch (opcao[..1])
         {
             case "T":
                 await InstalarListaAsync(_fabricantes);
                 break;
             case "S":
-                Console.Write(" Digite os números dos fabricantes (ex: 1,3): ");
-                var input = Console.ReadLine();
+                var input = AnsiConsole.Ask<string>("[bold yellow]Digite os números dos fabricantes[/] ([gray]ex: 1,3[/]):");
                 var indicesLocais = ParseIndices(input, _fabricantes.Count);
                 if (indicesLocais.Count > 0)
                 {
@@ -163,16 +163,11 @@ public class MsiView
                 }
                 else
                 {
-                    Console.WriteLine(" Nenhum índice válido. Nenhum fabricante será instalado.");
+                    AnsiConsole.MarkupLine("[yellow]Nenhum índice válido. Nenhum fabricante será instalado.[/]");
                 }
                 break;
             case "N":
-                Console.WriteLine(" Fabricantes ignorados.");
-                break;
-            default:
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine(" Opção inválida. Fabricantes não serão instalados.");
-                Console.ResetColor();
+                AnsiConsole.MarkupLine("[gray]Fabricantes ignorados.[/]");
                 break;
         }
     }
@@ -196,56 +191,35 @@ public class MsiView
 
     private async Task InstalarListaAsync(List<MsiInstallationModel> lista)
     {
-        Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("\n Iniciando instalação de " + lista.Count + " MSI(s)...\n");
-        Console.ResetColor();
+        AnsiConsole.MarkupLine($"\n[cyan]Iniciando instalação de {lista.Count} MSI(s)...[/]\n");
 
+        var resultadosDaEtapa = new List<SummaryResult>();
         int sucessos = 0;
+
         for (int i = 0; i < lista.Count; i++)
         {
             var model = lista[i];
             string nome = Path.GetFileName(model.MsiPath) ?? "";
-            string statusMsg = string.Format(" [{0}/{1}] {2,-50}... ", i + 1, lista.Count, nome);
-            Console.Write(statusMsg);
+
+            AnsiConsole.Markup($" [{i + 1}/{lista.Count}] {nome.EscapeMarkup().PadRight(50)}... ");
 
             bool ok = await _installer.InstallAsync(model);
 
             if (ok)
             {
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("[SUCESSO]");
-                Console.ResetColor();
+                AnsiConsole.MarkupLine("[green][SUCESSO][/]");
+                resultadosDaEtapa.Add(SummaryStore.Add("Aplicações (MSIs)", nome, true));
                 sucessos++;
             }
             else
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("[FALHA]");
-                Console.ResetColor();
+                AnsiConsole.MarkupLine("[red][FALHA][/]");
+                resultadosDaEtapa.Add(SummaryStore.Add("Aplicações (MSIs)", nome, false, "Falha na instalação"));
             }
         }
 
-        Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("\n Instalação concluída. " + sucessos + "/" + lista.Count + " MSIs instalados com sucesso.");
-        Console.ResetColor();
-    }
-
-    private void ShowHeader()
-    {
-        Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("==================================================");
-        Console.WriteLine("          INSTALAÇÃO DE APLICAÇÕES (MSIs)         ");
-        Console.WriteLine("==================================================");
-        Console.ResetColor();
-    }
-
-    private void ShowFinishedMessage()
-    {
-        Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("\n==================================================");
-        Console.WriteLine("      Fim da etapa de Instalação de MSIs.         ");
-        Console.WriteLine("==================================================");
-        Console.ResetColor();
-        Console.ReadKey();
+        AnsiConsole.WriteLine();
+        SummaryPanelView.ExibirEtapa("Aplicações (MSIs)", "📦", resultadosDaEtapa);
+        AnsiConsole.MarkupLine($"\n[cyan]Instalação concluída. {sucessos}/{lista.Count} MSIs instalados com sucesso.[/]");
     }
 }

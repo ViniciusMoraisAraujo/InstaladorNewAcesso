@@ -14,8 +14,11 @@ public class GoogleDriveDownloader
         _http.Timeout = TimeSpan.FromMinutes(10);
     }
     
-    public static string? ExtractFolderId(string url)
+    public static string? ExtractFolderId(string? url)
     {
+        if (string.IsNullOrWhiteSpace(url))
+            return null;
+
         var match = System.Text.RegularExpressions.Regex.Match(
             url, @"folders/([a-zA-Z0-9_-]+)");
         if (match.Success) return match.Groups[1].Value;
