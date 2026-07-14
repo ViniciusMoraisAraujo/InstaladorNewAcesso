@@ -1,6 +1,6 @@
-using System.Xml;
+﻿using System.Xml;
 using FluentAssertions;
-using InstaladorNewAcesso.Utils;
+using InstaladorNewAcesso.Core.Utils;
 
 namespace InstaladorNewAcesso.Tests.Utils;
 

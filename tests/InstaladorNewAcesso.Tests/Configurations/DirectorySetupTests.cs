@@ -1,6 +1,6 @@
-using FluentAssertions;
-using InstaladorNewAcesso.Configurations;
-using InstaladorNewAcesso.Models;
+﻿using FluentAssertions;
+using InstaladorNewAcesso.Core.Configurations;
+using InstaladorNewAcesso.Abstractions.Models;
 
 namespace InstaladorNewAcesso.Tests.Configurations;
 
@@ -13,7 +13,7 @@ public class DirectorySetupTests
     [Fact]
     public void GetAllPaths_ShouldIncludeAllBaseFolders()
     {
-        var paths = _sut.GetAllPaths(_paths).ToList();
+        var paths = DirectorySetup.GetAllPaths(_paths).ToList();
 
         paths.Should().Contain($@"{TestBasePath}\NewAcesso\AutoAtendimento");
         paths.Should().Contain($@"{TestBasePath}\NewAcesso\ConexBridge");
@@ -29,7 +29,7 @@ public class DirectorySetupTests
     [Fact]
     public void GetAllPaths_ShouldIncludeNestedFoldersUnderController()
     {
-        var paths = _sut.GetAllPaths(_paths).ToList();
+        var paths = DirectorySetup.GetAllPaths(_paths).ToList();
 
         paths.Should().Contain($@"{TestBasePath}\NewAcesso\Controller\ControleAcesso");
         paths.Should().Contain($@"{TestBasePath}\NewAcesso\Controller\CoreWs");
@@ -40,7 +40,7 @@ public class DirectorySetupTests
     [Fact]
     public void GetAllPaths_ShouldIncludeNestedFoldersUnderControllerOffline()
     {
-        var paths = _sut.GetAllPaths(_paths).ToList();
+        var paths = DirectorySetup.GetAllPaths(_paths).ToList();
 
         paths.Should().Contain($@"{TestBasePath}\NewAcesso\ControllerOffline\Arquivos");
         paths.Should().Contain($@"{TestBasePath}\NewAcesso\ControllerOffline\WinService_Ex");
@@ -50,7 +50,7 @@ public class DirectorySetupTests
     [Fact]
     public void GetAllPaths_ShouldIncludeFabricantesUnderWebAppUI()
     {
-        var paths = _sut.GetAllPaths(_paths).ToList();
+        var paths = DirectorySetup.GetAllPaths(_paths).ToList();
 
         paths.Should().Contain($@"{TestBasePath}\NewAcesso\WebAppUI\Fabricantes");
     }
@@ -59,7 +59,7 @@ public class DirectorySetupTests
     public void GetAllPaths_ShouldHaveCorrectTotalCount()
     {
         // 9 base folders + 4 Controller children + 3 ControllerOffline children + 1 WebAppUI child = 17
-        var paths = _sut.GetAllPaths(_paths).ToList();
+        var paths = DirectorySetup.GetAllPaths(_paths).ToList();
 
         paths.Should().HaveCount(17);
     }
@@ -67,7 +67,7 @@ public class DirectorySetupTests
     [Fact]
     public void GetAllPaths_ShouldNotContainDuplicatePaths()
     {
-        var paths = _sut.GetAllPaths(_paths).ToList();
+        var paths = DirectorySetup.GetAllPaths(_paths).ToList();
 
         paths.Should().OnlyHaveUniqueItems();
     }

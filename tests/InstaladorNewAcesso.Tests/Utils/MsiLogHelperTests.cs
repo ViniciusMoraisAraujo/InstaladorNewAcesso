@@ -1,5 +1,5 @@
-using FluentAssertions;
-using InstaladorNewAcesso.Utils;
+﻿using FluentAssertions;
+using InstaladorNewAcesso.Core.Utils;
 
 namespace InstaladorNewAcesso.Tests.Utils;
 
@@ -131,7 +131,7 @@ public class MsiLogHelperTests
         try
         {
             var lines = new List<string>();
-            for (int i = 0; i < 20; i++)
+            for (var i = 0; i < 20; i++)
                 lines.Add($"Line {i + 1}: Some log data...");
             lines[12] = "Line 13: CustomAction InstallFiles returned actual error code 1603";
             lines[13] = "Line 14: Action ended 14:32:10: InstallExecute. Return value 3.";
@@ -228,7 +228,7 @@ public class MsiLogHelperTests
         try
         {
             var lines = new List<string>();
-            for (int i = 0; i < 1000; i++)
+            for (var i = 0; i < 1000; i++)
                 lines.Add($"MSI (s) ({i:D3}!00) [00:00:00.000]: Some log entry #{i}");
             lines.Add("Action ended 15:00:00: InstallExecute. Return value 3.");
 

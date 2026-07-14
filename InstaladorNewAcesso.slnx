@@ -1,4 +1,6 @@
 <Solution>
-  <Project Path="src/InstaladorNewAcesso.csproj" />
+  <Project Path="src/InstaladorNewAcesso.Abstractions/InstaladorNewAcesso.Abstractions.csproj" />
+  <Project Path="src/InstaladorNewAcesso.Core/InstaladorNewAcesso.Core.csproj" />
+  <Project Path="src/InstaladorNewAcesso.Console/InstaladorNewAcesso.Console.csproj" />
   <Project Path="tests/InstaladorNewAcesso.Tests/InstaladorNewAcesso.Tests.csproj" />
 </Solution>

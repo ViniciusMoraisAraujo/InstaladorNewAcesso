@@ -1,0 +1,156 @@
+# EditorConfig para InstaladorNewAcesso
+# https://editorconfig.org
+
+root = true
+
+# ──────────────────────────────────────────
+# Regras base (todos os arquivos)
+# ──────────────────────────────────────────
+[*]
+charset = utf-8-bom
+end_of_line = crlf
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# ──────────────────────────────────────────
+# C# e dotnet
+# ──────────────────────────────────────────
+[*.cs]
+indent_style = space
+indent_size = 4
+dotnet_diagnostic.severity = default
+
+#### Naming rules ####
+
+# Public members: PascalCase
+dotnet_naming_style.pascal_case_style.capitalization = pascal_case
+dotnet_naming_style.pascal_case_style.required_suffix =
+dotnet_naming_style.pascal_case_style.required_prefix =
+
+dotnet_naming_symbols.public_symbols.applicable_kinds = *
+dotnet_naming_symbols.public_symbols.applicable_accessibilities = public
+dotnet_naming_symbols.public_symbols.required_modifiers =
+dotnet_naming_rule.public_members_should_be_pascal_case.severity = suggestion
+dotnet_naming_rule.public_members_should_be_pascal_case.symbols = public_symbols
+dotnet_naming_rule.public_members_should_be_pascal_case.style = pascal_case_style
+
+# Private fields: _camelCase
+dotnet_naming_style.private_field_style.capitalization = camel_case
+dotnet_naming_style.private_field_style.required_prefix = _
+dotnet_naming_style.private_field_style.required_suffix =
+
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_symbols.private_fields.required_modifiers =
+dotnet_naming_rule.private_fields_should_be_camel_case_with_underscore.severity = suggestion
+dotnet_naming_rule.private_fields_should_be_camel_case_with_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_should_be_camel_case_with_underscore.style = private_field_style
+
+# Private static fields: s_camelCase
+dotnet_naming_style.private_static_field_style.capitalization = camel_case
+dotnet_naming_style.private_static_field_style.required_prefix = s_
+dotnet_naming_style.private_static_field_style.required_suffix =
+
+dotnet_naming_symbols.private_static_fields.applicable_kinds = field
+dotnet_naming_symbols.private_static_fields.applicable_accessibilities = private
+dotnet_naming_symbols.private_static_fields.required_modifiers = static
+dotnet_naming_rule.private_static_fields_should_be_camel_case_with_s_prefix.severity = suggestion
+dotnet_naming_rule.private_static_fields_should_be_camel_case_with_s_prefix.symbols = private_static_fields
+dotnet_naming_rule.private_static_fields_should_be_camel_case_with_s_prefix.style = private_static_field_style
+
+# Interfaces: IPascalCase
+dotnet_naming_style.interface_style.capitalization = pascal_case
+dotnet_naming_style.interface_style.required_prefix = I
+dotnet_naming_style.interface_style.required_suffix =
+
+dotnet_naming_symbols.interface_types.applicable_kinds = interface
+dotnet_naming_rule.interfaces_should_be_ipascalcase.severity = suggestion
+dotnet_naming_rule.interfaces_should_be_ipascalcase.symbols = interface_types
+dotnet_naming_rule.interfaces_should_be_ipascalcase.style = interface_style
+
+# Async methods: Async suffix
+dotnet_naming_style.async_method_style.capitalization = pascal_case
+dotnet_naming_style.async_method_style.required_suffix = Async
+
+dotnet_naming_symbols.async_methods.applicable_kinds = method
+dotnet_naming_symbols.async_methods.applicable_accessibilities = *
+dotnet_naming_symbols.async_methods.required_modifiers = async
+dotnet_naming_rule.async_methods_should_end_with_async.severity = suggestion
+dotnet_naming_rule.async_methods_should_end_with_async.symbols = async_methods
+dotnet_naming_rule.async_methods_should_end_with_async.style = async_method_style
+
+#### Code style ####
+
+# var preferences
+csharp_style_var_for_built_in_types = true:warning
+csharp_style_var_when_type_is_apparent = true:warning
+csharp_style_var_elsewhere = true:suggestion
+
+# Expression-bodied members
+csharp_style_expression_bodied_methods = true:suggestion
+csharp_style_expression_bodied_constructors = false:none
+csharp_style_expression_bodied_properties = true:suggestion
+
+# Modifier preferences
+csharp_preferred_modifier_order = public,private,protected,internal,static,extern,new,virtual,abstract,sealed,override,readonly,unsafe,volatile,async:none
+
+# Newline options
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_new_line_before_members_in_object_initializers = true
+csharp_new_line_before_members_in_anonymous_types = true
+
+# "using" preferences
+csharp_using_directive_placement = outside_namespace:suggestion
+
+# Null-checking preferences
+csharp_style_throw_expression = true:suggestion
+csharp_style_conditional_delegate_call = true:suggestion
+
+#### Diagnostics ####
+
+# CA1062: Validate arguments of public methods
+dotnet_diagnostic.CA1062.severity = warning
+
+# IDE0005: Remove unnecessary usings
+dotnet_diagnostic.IDE0005.severity = warning
+
+# IDE0044: Make field readonly
+dotnet_diagnostic.IDE0044.severity = suggestion
+
+# IDE0051: Remove unused private members
+dotnet_diagnostic.IDE0051.severity = warning
+
+# ──────────────────────────────────────────
+# XML / .csproj / .slnx
+# ──────────────────────────────────────────
+[*.{csproj,props,targets,slnx,xml,config,manifest}]
+indent_style = space
+indent_size = 2
+
+# ──────────────────────────────────────────
+# JSON
+# ──────────────────────────────────────────
+[*.json]
+indent_style = space
+indent_size = 2
+
+# ──────────────────────────────────────────
+# Markdown
+# ──────────────────────────────────────────
+[*.md]
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = false
+
+# ──────────────────────────────────────────
+# PowerShell
+# ──────────────────────────────────────────
+[*.ps1]
+indent_style = space
+indent_size = 4
+end_of_line = crlf

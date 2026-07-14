@@ -1,5 +1,5 @@
-using FluentAssertions;
-using InstaladorNewAcesso.Models;
+﻿using FluentAssertions;
+using InstaladorNewAcesso.Abstractions.Models;
 
 namespace InstaladorNewAcesso.Tests.Models;
 

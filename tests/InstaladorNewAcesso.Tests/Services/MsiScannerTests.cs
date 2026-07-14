@@ -1,6 +1,6 @@
-using FluentAssertions;
-using InstaladorNewAcesso.Models;
-using InstaladorNewAcesso.Services;
+﻿using FluentAssertions;
+using InstaladorNewAcesso.Abstractions.Models;
+using InstaladorNewAcesso.Core.Services;
 
 namespace InstaladorNewAcesso.Tests.Services;
 
@@ -212,6 +212,276 @@ public class MsiScannerTests : IDisposable
         var result = scanner.Scan();
 
         result.Should().HaveCount(2);
+    }
+
+    // ============================================================
+    //  Edge cases — deep nested subfolders
+    // ============================================================
+
+    [Fact]
+    public void Scan_ShouldResolveFolderMapping_InDeepNestedSubfolder()
+    {
+        // Controller/Apps/DeepDir/ — last folder is DeepDir (no mapping),
+        // but first folder is Controller (has mapping).
+        var deepDir = Path.Combine(_tempRoot, "Controller", "Apps", "DeepDir");
+        Directory.CreateDirectory(deepDir);
+        var msiPath = Path.Combine(deepDir, "App.msi");
+        File.Create(msiPath).Dispose();
+
+        var scanner = new MsiScanner(_paths, DbChoice, _tempRoot);
+
+        var result = scanner.Scan();
+
+        // LastFolder "DeepDir" not in mapping, so fallback to firstFolder "Controller"
+        result.Should().ContainSingle();
+        result[0].TargetDirectory.Should().Be(_paths.Controller);
+    }
+
+    [Fact]
+    public void Scan_FallsBackToFirstFolder_WhenLastFolderNotMapped()
+    {
+        // ConnectionRecord/SubDir/ — last folder SubDir not in mapping,
+        // first folder ConnectionRecord has mapping.
+        var subDir = Path.Combine(_tempRoot, "ConnectionRecord", "SubDir");
+        Directory.CreateDirectory(subDir);
+        var msiPath = Path.Combine(subDir, "DataApp.msi");
+        File.Create(msiPath).Dispose();
+
+        var scanner = new MsiScanner(_paths, DbChoice, _tempRoot);
+
+        var result = scanner.Scan();
+
+        result.Should().ContainSingle();
+        result[0].TargetDirectory.Should().Be(_paths.ConnectionRecord);
+    }
+
+    // ============================================================
+    //  Edge cases — multiple MSIs in same folder
+    // ============================================================
+
+    [Fact]
+    public void Scan_ShouldFindAllMsIs_InSameFolder()
+    {
+        var dir = Path.Combine(_tempRoot, "Controller");
+        Directory.CreateDirectory(dir);
+        var msi1 = Path.Combine(dir, "App1.msi");
+        var msi2 = Path.Combine(dir, "App2.msi");
+        File.Create(msi1).Dispose();
+        File.Create(msi2).Dispose();
+
+        var scanner = new MsiScanner(_paths, DbChoice, _tempRoot);
+
+        var result = scanner.Scan();
+
+        result.Should().HaveCount(2);
+        result.Should().Contain(r => r.MsiPath == msi1);
+        result.Should().Contain(r => r.MsiPath == msi2);
+    }
+
+    // ============================================================
+    //  Edge cases — mixed db and non-db folders
+    // ============================================================
+
+    [Fact]
+    public void Scan_MixedDbAndNonDbFolders_ProcessesOnlyMatching()
+    {
+        var sqlDir = Path.Combine(_tempRoot, "SQLServer");
+        Directory.CreateDirectory(sqlDir);
+        File.Create(Path.Combine(sqlDir, "DbApp.msi")).Dispose();
+
+        var oracleDir = Path.Combine(_tempRoot, "Oracle");
+        Directory.CreateDirectory(oracleDir);
+        File.Create(Path.Combine(oracleDir, "OracleApp.msi")).Dispose();
+
+        var winDir = Path.Combine(_tempRoot, "Win");
+        Directory.CreateDirectory(winDir);
+        File.Create(Path.Combine(winDir, "WinApp.msi")).Dispose();
+
+        var scanner = new MsiScanner(_paths, "SQLServer", _tempRoot);
+
+        var result = scanner.Scan();
+
+        // SQLServer included (matches), Oracle skipped, Win always included
+        result.Should().HaveCount(2);
+        result.Should().Contain(r => r.MsiPath.Contains("DbApp"));
+        result.Should().Contain(r => r.MsiPath.Contains("WinApp"));
+    }
+
+    // ============================================================
+    //  Edge cases — non-MSI files ignored
+    // ============================================================
+
+    [Fact]
+    public void Scan_ShouldIgnoreNonMsiFiles()
+    {
+        Directory.CreateDirectory(_tempRoot);
+        File.Create(Path.Combine(_tempRoot, "readme.txt")).Dispose();
+        File.Create(Path.Combine(_tempRoot, "setup.exe")).Dispose();
+        File.Create(Path.Combine(_tempRoot, "data.zip")).Dispose();
+
+        var scanner = new MsiScanner(_paths, DbChoice, _tempRoot);
+
+        var result = scanner.Scan();
+
+        result.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Scan_ShouldIgnoreNonMsiFiles_InSubfolders()
+    {
+        var subDir = Path.Combine(_tempRoot, "Controller");
+        Directory.CreateDirectory(subDir);
+        File.Create(Path.Combine(subDir, "readme.txt")).Dispose();
+        File.Create(Path.Combine(subDir, "setup.exe")).Dispose();
+
+        var scanner = new MsiScanner(_paths, DbChoice, _tempRoot);
+
+        var result = scanner.Scan();
+
+        result.Should().BeEmpty();
+    }
+
+    // ============================================================
+    //  Edge cases — case-insensitive folder matching
+    // ============================================================
+
+    [Fact]
+    public void Scan_ShouldMatchFolderMapping_CaseInsensitive()
+    {
+        // "controller" (lowercase) should match "Controller" mapping
+        var dir = Path.Combine(_tempRoot, "controller");
+        Directory.CreateDirectory(dir);
+        var msiPath = Path.Combine(dir, "App.msi");
+        File.Create(msiPath).Dispose();
+
+        var scanner = new MsiScanner(_paths, DbChoice, _tempRoot);
+
+        var result = scanner.Scan();
+
+        result.Should().ContainSingle();
+        result[0].TargetDirectory.Should().Be(_paths.Controller);
+    }
+
+    [Fact]
+    public void Scan_ShouldMatchFileNameMapping_CaseInsensitive()
+    {
+        Directory.CreateDirectory(_tempRoot);
+        var msiPath = Path.Combine(_tempRoot, "CONTROLLERAPP.msi");
+        File.Create(msiPath).Dispose();
+
+        var scanner = new MsiScanner(_paths, DbChoice, _tempRoot);
+
+        var result = scanner.Scan();
+
+        result.Should().ContainSingle();
+        result[0].TargetDirectory.Should().Be(_paths.Controller);
+    }
+
+    // ============================================================
+    //  Edge cases — OffLine folder mapping
+    // ============================================================
+
+    [Fact]
+    public void Scan_OffLineFolder_MapsToNewAcessoRootOffLine()
+    {
+        var offlineDir = Path.Combine(_tempRoot, "OffLine");
+        Directory.CreateDirectory(offlineDir);
+        var msiPath = Path.Combine(offlineDir, "OfflineApp.msi");
+        File.Create(msiPath).Dispose();
+
+        var scanner = new MsiScanner(_paths, DbChoice, _tempRoot);
+
+        var result = scanner.Scan();
+
+        result.Should().ContainSingle();
+        result[0].TargetDirectory.Should().Be(Path.Combine(_paths.NewAcessoRoot, "OffLine"));
+    }
+
+    // ============================================================
+    //  Edge cases — root MSIs with UI/DS in subfolder names
+    // ============================================================
+
+    [Fact]
+    public void Scan_RootMsi_ContainingUI_IsSkipped()
+    {
+        Directory.CreateDirectory(_tempRoot);
+        var msiPath = Path.Combine(_tempRoot, "MyWebAppUI.msi");
+        File.Create(msiPath).Dispose();
+
+        var scanner = new MsiScanner(_paths, DbChoice, _tempRoot);
+
+        var result = scanner.Scan();
+
+        result.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Scan_RootMsi_ContainingDS_IsSkipped()
+    {
+        Directory.CreateDirectory(_tempRoot);
+        var msiPath = Path.Combine(_tempRoot, "MyWebAppDS.msi");
+        File.Create(msiPath).Dispose();
+
+        var scanner = new MsiScanner(_paths, DbChoice, _tempRoot);
+
+        var result = scanner.Scan();
+
+        result.Should().BeEmpty();
+    }
+
+    // ============================================================
+    //  Edge cases — fileNameMapping keys in order
+    // ============================================================
+
+    [Fact]
+    public void Scan_StandAloneEx_MapsToControllerOfflineWinServiceEx()
+    {
+        Directory.CreateDirectory(_tempRoot);
+        var msiPath = Path.Combine(_tempRoot, "StandAloneEx.msi");
+        File.Create(msiPath).Dispose();
+
+        var scanner = new MsiScanner(_paths, DbChoice, _tempRoot);
+
+        var result = scanner.Scan();
+
+        result.Should().ContainSingle();
+        result[0].TargetDirectory.Should().Be(_paths.ControllerOfflineWinServiceEx);
+    }
+
+    [Fact]
+    public void Scan_StandAloneIn_MapsToControllerOfflineWinServiceIn()
+    {
+        Directory.CreateDirectory(_tempRoot);
+        var msiPath = Path.Combine(_tempRoot, "StandAloneIn.msi");
+        File.Create(msiPath).Dispose();
+
+        var scanner = new MsiScanner(_paths, DbChoice, _tempRoot);
+
+        var result = scanner.Scan();
+
+        result.Should().ContainSingle();
+        result[0].TargetDirectory.Should().Be(_paths.ControllerOfflineWinServiceIn);
+    }
+
+    // ============================================================
+    //  Edge cases — UI/DS MSIs in subfolders are also skipped
+    // ============================================================
+
+    [Fact]
+    public void Scan_ShouldSkipUIandDSMsIs_InSubfolders()
+    {
+        var subDir = Path.Combine(_tempRoot, "WebApps");
+        Directory.CreateDirectory(subDir);
+        File.Create(Path.Combine(subDir, "WebAppUI.msi")).Dispose();
+        File.Create(Path.Combine(subDir, "WebAppDS.msi")).Dispose();
+        // Add a valid one
+        File.Create(Path.Combine(subDir, "NormalApp.msi")).Dispose();
+
+        var scanner = new MsiScanner(_paths, DbChoice, _tempRoot);
+
+        var result = scanner.Scan();
+
+        result.Should().ContainSingle();
     }
 
     public void Dispose()

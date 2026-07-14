@@ -1,5 +1,5 @@
-using FluentAssertions;
-using InstaladorNewAcesso.Utils;
+﻿using FluentAssertions;
+using InstaladorNewAcesso.Core.Utils;
 
 namespace InstaladorNewAcesso.Tests.Utils;
 
@@ -134,5 +134,99 @@ public class IniHelperBaseTests
 
         lines[0].Should().Contain("Updated"); // atualiza o primeiro
         lines[1].Should().Contain("Second");  // não mexe no segundo
+    }
+
+    // ── Section-aware ─────────────────────
+
+    [Fact]
+    public void SetIniKey_WithSection_UpdatesKeyInSection()
+    {
+        var lines = new List<string>
+        {
+            "[MySection]",
+            "MyKey = OldValue",
+            "[Other]",
+            "MyKey = OtherValue"
+        };
+
+        IniHelperBase.SetIniKey(lines, "MyKey", "NewValue", section: "MySection");
+
+        lines.Should().Contain(l => l.Contains("NewValue"));
+        lines.Should().Contain(l => l.Contains("OtherValue")); // other section untouched
+    }
+
+    [Fact]
+    public void SetIniKey_WithSection_CaseInsensitiveSectionMatch()
+    {
+        var lines = new List<string>
+        {
+            "[mysection]",
+            "MyKey = OldValue"
+        };
+
+        IniHelperBase.SetIniKey(lines, "MyKey", "NewValue", section: "MySection");
+
+        lines.Should().Contain(l => l.Contains("NewValue"));
+    }
+
+    [Fact]
+    public void SetIniKey_WithSection_DoesNotTouchKeyOutsideSection()
+    {
+        var lines = new List<string>
+        {
+            "MyKey = GlobalValue",
+            "[Target]",
+            "OtherKey = Something"
+        };
+
+        var modified = IniHelperBase.SetIniKey(lines, "MyKey", "NewValue", section: "Target");
+
+        modified.Should().BeFalse();
+        lines.Should().Contain(l => l.Contains("GlobalValue"));
+    }
+
+    [Fact]
+    public void SetIniKey_WithSection_AddsKeyIfMissingInSection()
+    {
+        var lines = new List<string>
+        {
+            "[MySection]",
+            "ExistingKey = OK"
+        };
+
+        var modified = IniHelperBase.SetIniKey(lines, "NewKey", "Value", section: "MySection");
+
+        modified.Should().BeTrue();
+        lines.Should().Contain(l => l.Contains("NewKey") && l.Contains("Value"));
+    }
+
+    [Fact]
+    public void SetIniKey_WithSection_DoesNotAddKeyIfSectionMissing()
+    {
+        var lines = new List<string>
+        {
+            "[OtherSection]",
+            "ExistingKey = OK"
+        };
+
+        var modified = IniHelperBase.SetIniKey(lines, "MyKey", "Value", section: "MySection");
+
+        modified.Should().BeFalse();
+        lines.Should().NotContain(l => l.Contains("MyKey"));
+    }
+
+    [Fact]
+    public void SetIniKey_WithoutSection_IgnoresSections_FlatBehavior()
+    {
+        // Backward-compatible: no section parameter = original flat behavior
+        var lines = new List<string>
+        {
+            "[SomeSection]",
+            "MyKey = OldValue"
+        };
+
+        IniHelperBase.SetIniKey(lines, "MyKey", "NewValue");
+
+        lines.Should().Contain(l => l.Contains("NewValue"));
     }
 }

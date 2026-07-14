@@ -1,5 +1,5 @@
-using FluentAssertions;
-using InstaladorNewAcesso.Configurations;
+﻿using FluentAssertions;
+using InstaladorNewAcesso.Core.Configurations;
 
 namespace InstaladorNewAcesso.Tests.Configurations;
 

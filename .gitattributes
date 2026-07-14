@@ -1,0 +1,73 @@
+# ──────────────────────────────────────────
+# Configuração Git para InstaladorNewAcesso
+# ──────────────────────────────────────────
+
+# Normaliza todos os arquivos de texto para LF no repositório,
+# mantendo CRLF no checkout em Windows.
+* text=auto eol=crlf
+
+# ──────────────────────────────────────────
+# C# — diff linguístico e normalização
+# ──────────────────────────────────────────
+*.cs text diff=csharp
+
+# ──────────────────────────────────────────
+# Projetos .NET / MSBuild
+# ──────────────────────────────────────────
+*.csproj  text diff=xml
+*.props   text diff=xml
+*.targets text diff=xml
+*.slnx    text
+*.sln     text
+*.manifest text
+
+# ──────────────────────────────────────────
+# Configuração
+# ──────────────────────────────────────────
+*.config   text diff=xml
+*.settings.json text
+
+# ──────────────────────────────────────────
+# Scripts
+# ──────────────────────────────────────────
+*.ps1 text
+*.psm1 text
+*.bat text
+*.cmd text
+
+# ──────────────────────────────────────────
+# Documentação
+# ──────────────────────────────────────────
+*.md text
+*.txt text
+
+# ──────────────────────────────────────────
+# Editor / IDE
+# ──────────────────────────────────────────
+.editorconfig text
+.gitignore text
+.gitattributes text
+
+# ──────────────────────────────────────────
+# Binários — nunca normalizar nem fazer diff
+# ──────────────────────────────────────────
+*.exe   binary
+*.dll   binary
+*.pdb   binary
+*.msi   binary
+*.cab   binary
+*.nupkg binary
+*.snupkg binary
+*.png   binary
+*.ico   binary
+*.icns  binary
+*.zip   binary
+*.7z    binary
+*.gz    binary
+*.tar   binary
+
+# ──────────────────────────────────────────
+# Logs e builds — ignorar diffs
+# ──────────────────────────────────────────
+*.binlog binary
+*.log    -diff

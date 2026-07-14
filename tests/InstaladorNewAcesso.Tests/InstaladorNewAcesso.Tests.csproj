@@ -2,9 +2,13 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <!--
+      CA1707: Suprimido porque xUnit usa MethodName_Scenario_ExpectedResult (convenção padrão).
+      CA1711: Suprimido para nomes de teste com sufixo Ex (Scan_StandAloneEx_...).
+      CA1852: Suprimido para classes auxiliares de teste (MockHttpHandler, etc.).
+    -->
+    <NoWarn>$(NoWarn);CA1707;CA1711;CA1852</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -24,7 +28,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\InstaladorNewAcesso.csproj" />
+    <ProjectReference Include="..\..\src\InstaladorNewAcesso.Abstractions\InstaladorNewAcesso.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\InstaladorNewAcesso.Core\InstaladorNewAcesso.Core.csproj" />
   </ItemGroup>
 
 </Project>
