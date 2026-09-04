@@ -1,56 +1,78 @@
-
-using InstaladorNewAcesso.Core.Services;
+ï»¿using InstaladorNewAcesso.Core.Services;
 
 namespace InstaladorNewAcesso.Core.Utils;
 
 public static class ControleAcessoConfigHelper
 {
     private const string IniFileName = "PrimeAcesso.ControleAcesso.ini";
-    private const string KeyName = "PathDataSouce_NewAcessoConnectionRecord";
+    private const string KeyPathDataSource = "PathDataSource_NewAcessoConnectionRecord";
+    private const string TypoKeyPathDataSource = "PathDataSouce_NewAcessoConnectionRecord";
+    private const string KeyIdConexao = "ID_Conexao_NewAcessoConnectionRecord";
 
     /// <summary>
-    /// Após instalar o ControleAcesso, verifica se o diretório de destino
-    /// contém o arquivo PrimeAcesso.ControleAcesso.ini e, se sim,
-    /// ajusta a chave PathDataSouce_NewAcessoConnectionRecord
-    /// com o caminho absoluto do banco de dados.
+    /// Apos instalar o ControleAcesso, atualiza o arquivo .ini com o caminho do banco e ID de conexao.
     /// </summary>
     public static bool UpdateIniAfterInstall(string targetDirectory)
     {
-        var iniPath = Path.Combine(targetDirectory, IniFileName);
+        return UpdateConfig(targetDirectory);
+    }
+
+    /// <summary>
+    /// Atualiza o arquivo PrimeAcesso.ControleAcesso.ini com ID de conexao e caminho da base SQLite.
+    /// </summary>
+    public static bool UpdateConfig(string targetDirectory, string? idConexao = null, string? dbPath = null)
+    {
+        var normalizedDir = ConfigHelperBase.NormalizeDirectoryPath(targetDirectory);
+        var iniPath = Path.Combine(normalizedDir, IniFileName);
 
         if (!File.Exists(iniPath))
         {
-            UIScope.WriteMessage($"[gray]   [[INFO]] Arquivo .INI não encontrado em: {MarkupHelper.Escape(iniPath)}[/]");
+            UIScope.WriteMessage($"[gray]   [[INFO]] Arquivo .INI nao encontrado em: {MarkupHelper.Escape(iniPath)}[/]");
             return false;
         }
 
         try
         {
-            // targetDirectory = {BasePath}\NewAcesso\Controller\ControleAcesso
-            var controllerDir = Path.GetDirectoryName(targetDirectory); // {BasePath}\NewAcesso\Controller
-            var newAcessoRoot = Path.GetDirectoryName(controllerDir);   // {BasePath}\NewAcesso
+            var controllerDir = Path.GetDirectoryName(normalizedDir);
+            var newAcessoRoot = controllerDir != null ? Path.GetDirectoryName(controllerDir) : null;
 
-            if (string.IsNullOrEmpty(controllerDir) || string.IsNullOrEmpty(newAcessoRoot))
+            var resolvedDbPath = dbPath;
+            if (string.IsNullOrEmpty(resolvedDbPath) && !string.IsNullOrEmpty(newAcessoRoot))
             {
-                UIScope.WriteMessage($"[yellow]   [[AVISO]] Não foi possível determinar estrutura de diretórios a partir de: {MarkupHelper.Escape(targetDirectory)}[/]");
-                return false;
+                resolvedDbPath = Path.Combine(newAcessoRoot, "ConnectionRecord", "DataBase", "NewAcessoConnection.s3db");
             }
 
-            var dbPath = Path.Combine(newAcessoRoot, "ConnectionRecord", "DataBase", "NewAcessoConnection.s3db");
+            if (string.IsNullOrEmpty(resolvedDbPath))
+            {
+                resolvedDbPath = @"C:\SoftPrime\NewAcesso\ConnectionRecord\DataBase\NewAcessoConnection.s3db";
+            }
+
+            var resolvedId = idConexao ?? "1";
+
+            ConfigBackupService.BackupSingleFile(iniPath);
 
             var lines = File.ReadAllLines(iniPath).ToList();
-            var modified = IniHelperBase.SetIniKey(lines, KeyName, dbPath, useQuotes: true);
 
-            if (modified)
+            // Atualiza chaves na secao [GERAL] e mantem compatibilidade com DLLs legadas
+            var mod1 = IniHelperBase.SetIniKey(lines, KeyIdConexao, resolvedId, useQuotes: false, section: "GERAL");
+            var mod2 = IniHelperBase.SetIniKey(lines, KeyPathDataSource, resolvedDbPath, useQuotes: true, section: "GERAL");
+            var mod3 = IniHelperBase.SetIniKey(lines, TypoKeyPathDataSource, resolvedDbPath, useQuotes: true);
+
+            if (mod1 || mod2 || mod3)
             {
                 File.WriteAllLines(iniPath, lines);
+                UIScope.WriteMessage($"   [green][[OK]] ControleAcesso .ini configurado com sucesso.[/]");
+            }
+            else
+            {
+                UIScope.WriteMessage($"   [gray][[INFO]] ControleAcesso .ini ja esta atualizado.[/]");
             }
 
             return true;
         }
         catch (Exception ex)
         {
-            UIScope.WriteMessage($"[red]   [[ERRO]] Falha ao atualizar .INI: {MarkupHelper.Escape(ex.Message)}[/]");
+            UIScope.WriteMessage($"[red]   [[ERRO]] Falha ao atualizar ControleAcesso .INI: {MarkupHelper.Escape(ex.Message)}[/]");
             return false;
         }
     }

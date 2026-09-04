@@ -1,4 +1,4 @@
-using System.Globalization;
+ï»¿using System.Globalization;
 using System.Text;
 using System.Xml;
 using InstaladorNewAcesso.Core.Services;
@@ -10,31 +10,31 @@ public static class ControleAcessoAgendamentoHelper
     private const string FileName = "AgendamentoEquipOffline.xml";
 
     /// <summary>
-    /// Após instalar o ControleAcesso, verifica se o diretório de destino
-    /// contém o AgendamentoEquipOffline.xml. Se existir, lê os valores
-    /// atuais e permite ao usuário editá-los, mantendo os valores
-    /// anteriores como padrão nos prompts.
+    /// Apos instalar o ControleAcesso, verifica se o diretorio de destino
+    /// contem o AgendamentoEquipOffline.xml. Se existir, le os valores
+    /// atuais e permite ao usuario edita-los, mantendo os valores
+    /// anteriores como padrao nos prompts.
     /// </summary>
     public static bool UpdateAgendamentoAfterInstall(string targetDirectory)
     {
-        var filePath = Path.Combine(targetDirectory, FileName);
+        var normalizedDir = ConfigHelperBase.NormalizeDirectoryPath(targetDirectory);
+        var filePath = Path.Combine(normalizedDir, FileName);
 
         if (!File.Exists(filePath))
         {
-            UIScope.WriteMessage($"[gray]   [[INFO]] AgendamentoEquipOffline.xml (ControleAcesso) não encontrado em: {MarkupHelper.Escape(filePath)}[/]");
+            UIScope.WriteMessage($"[gray]   [[INFO]] AgendamentoEquipOffline.xml (ControleAcesso) nao encontrado em: {MarkupHelper.Escape(filePath)}[/]");
             return false;
         }
 
         try
         {
-            UIScope.WriteMessage($"\n   [bold yellow]Configuração do Agendamento de Equipamentos Offline (ControleAcesso):[/]");
+            UIScope.WriteMessage($"\n   [bold yellow]Configuracao do Agendamento de Equipamentos Offline (ControleAcesso):[/]");
 
-            // --- Lê valores atuais do XML existente ---
-            var (currentIds, currentHora, currentMinuto, currentDiasSemana, currentObter, currentEnviar)
+            // --- Le valores atuais do XML existente ---
+            var (currentIds, currentHora, currentMinuto, currentDiasSemana, currentObter, currentEnviar, isLegacy)
                 = ReadExistingValues(filePath);
-            // Ativo é sempre true (definição do sistema), não exposto ao usuário
 
-            // --- Prompts com valores atuais como padrão ---
+            // --- Prompts com valores atuais como padrao ---
             var idsDefault = currentIds.Count > 0 ? string.Join("|", currentIds) : "3|7|9";
             var idsInput = UIScope.AskInput(
                 $"   [bold yellow]IDs dos equipamentos[/] (separados por |, atual: [gray]{MarkupHelper.Escape(idsDefault)}[/]):");
@@ -49,7 +49,7 @@ public static class ControleAcessoAgendamentoHelper
 
             if (ids.Count == 0)
             {
-                UIScope.WriteMessage("[yellow]   [[AVISO]]  Nenhum ID informado. Agendamento não será alterado.[/]");
+                UIScope.WriteMessage("[yellow]   [[AVISO]]  Nenhum ID informado. Agendamento nao sera alterado.[/]");
                 return false;
             }
 
@@ -73,7 +73,42 @@ public static class ControleAcessoAgendamentoHelper
             var enviarArquivos = UIScope.Confirm(
                 "   [bold yellow]Enviar arquivos para os equipamentos?[/]", currentEnviar);
 
-            // --- Gera o XML atualizado ---
+            ConfigBackupService.BackupSingleFile(filePath);
+
+            if (isLegacy)
+            {
+                var legacyDoc = new XmlDocument();
+                legacyDoc.Load(filePath);
+                var legacyRoot = legacyDoc.DocumentElement!;
+
+                var idsNode = legacyRoot.SelectSingleNode("IdsEquipamentos") ?? legacyRoot.SelectSingleNode("EquipamentoId");
+                if (idsNode != null)
+                    idsNode.InnerText = idsInput;
+
+                var horaNode = legacyRoot.SelectSingleNode("HoraInicio");
+                if (horaNode != null)
+                    horaNode.InnerText = $"{horaVal:D2}:{minVal:D2}";
+
+                var diasNode = legacyRoot.SelectSingleNode("DiasSemana");
+                if (diasNode != null)
+                    diasNode.InnerText = diasSemana;
+
+                var settingsLegacy = new XmlWriterSettings
+                {
+                    Indent = true,
+                    IndentChars = "  ",
+                    Encoding = new UTF8Encoding(false),
+                    OmitXmlDeclaration = false
+                };
+
+                using var legacyWriter = XmlWriter.Create(filePath, settingsLegacy);
+                legacyDoc.Save(legacyWriter);
+
+                UIScope.WriteMessage($"   [green][[OK]] AgendamentoEquipOffline.xml (ControleAcesso) atualizado.[/]");
+                return true;
+            }
+
+            // --- Gera o XML atualizado (novo formato) ---
             var doc = new XmlDocument();
             var root = doc.CreateElement("Agendamentos");
             doc.AppendChild(root);
@@ -82,7 +117,7 @@ public static class ControleAcessoAgendamentoHelper
             {
                 var ag = doc.CreateElement("Agendamento");
 
-                AddComment(ag, "PARA UTLIZAR O AGENDAMENTO PARA MAIS DE UM EQUIPAMENTO\n        SEPARE OS IDENTIFICADORES POR '|' Ex: 3|7|9\n    ");
+                AddComment(ag, "PARA UTLIZAR O AGENDAMENTO PARA MAIS DE UM EQUIPAMENTO\n        SEPARE OS IDENTIFICADORES POR \'|\' Ex: 3|7|9\n    ");
                 AddElement(ag, "EquipamentoId", id);
 
                 AddComment(ag, "VALOR ENTRE 0 E 23\n    ");
@@ -91,13 +126,13 @@ public static class ControleAcessoAgendamentoHelper
                 AddComment(ag, "VALOR ENTRE 0 E 59\n    ");
                 AddElement(ag, "Minuto", minVal.ToString(CultureInfo.InvariantCulture));
 
-                AddComment(ag, "DIA DA SEMANA EM QUE SERÁ EXECUTADO\n     0 - DOMINGO\n     1 - SEGUNDA-FEIRA\n     2 - TERÇA-FEIRA\n     3 - QUARTA-FEIRA\n     4 - QUINTA-FEIRA\n     5 - SEXTA-FEIRA\n     6 - SÁBADO  \n     Informar valores separados por '|' Ex: '0|2|6' (executará nos dias; segunda, terça e sábado)\n    ");
+                AddComment(ag, "DIA DA SEMANA EM QUE SERA EXECUTADO\n     0 - DOMINGO\n     1 - SEGUNDA-FEIRA\n     2 - TERCA-FEIRA\n     3 - QUARTA-FEIRA\n     4 - QUINTA-FEIRA\n     5 - SEXTA-FEIRA\n     6 - SABADO  \n     Informar valores separados por \'|\' Ex: \'0|2|6\' (executara nos dias; segunda, terca e sabado)\n    ");
                 AddElement(ag, "DiasSemana", diasSemana);
 
                 AddComment(ag, "true OU false\n    ");
                 AddElement(ag, "Ativo", "true");
 
-                AddComment(ag, "Possibilita somente a obtenção de arquivos\n    ");
+                AddComment(ag, "Possibilita somente a obtencao de arquivos\n    ");
                 AddElement(ag, "ObterArquivos", obterArquivos ? "true" : "false");
 
                 AddComment(ag, "Possibilita somente o Envio dos arquivos\n    ");
@@ -117,7 +152,7 @@ public static class ControleAcessoAgendamentoHelper
             using var writer = XmlWriter.Create(filePath, settings);
             doc.Save(writer);
 
-            UIScope.WriteMessage($"   [green][[OK]] AgendamentoEquipOffline.xml (ControleAcesso) atualizado com {ids.Count} equipamento(s).[/]");
+            UIScope.WriteMessage($"   [green][[OK]] AgendamentoEquipOffline.xml (ControleAcesso) gerado com sucesso.[/]");
             return true;
         }
         catch (Exception ex)
@@ -128,35 +163,40 @@ public static class ControleAcessoAgendamentoHelper
     }
 
     /// <summary>
-    /// Versão sem interação com o usuário — aceita parâmetros diretamente.
-    /// Útil para integração com WinForms (ScheduleControl) ou automação.
-    /// Gera o XML AgendamentoEquipOffline.xml com os parâmetros fornecidos.
-    /// Nota: este método é simplificado e não lê valores existentes.
+    /// Versao sem interacao com o usuario â€” aceita parametros diretamente.
+    /// Util para integracao com WinForms (ScheduleControl) ou automacao.
+    /// Gera o XML AgendamentoEquipOffline.xml com os parametros fornecidos.
     /// </summary>
     public static bool UpdateAgendamento(string targetDirectory, string hora, string diasSemana, string intervalo)
     {
         ArgumentNullException.ThrowIfNull(hora);
-        var filePath = Path.Combine(targetDirectory, FileName);
+        var normalizedDir = ConfigHelperBase.NormalizeDirectoryPath(targetDirectory);
+        var filePath = Path.Combine(normalizedDir, FileName);
 
         try
         {
-            if (!int.TryParse(hora.Split(':')[0], out var horaVal) || horaVal < 0 || horaVal > 23)
+            if (!int.TryParse(hora.Split(':' )[0], out var horaVal) || horaVal < 0 || horaVal > 23)
                 horaVal = 22;
-            if (!int.TryParse(hora.Split(':')[1], out var minVal) || minVal < 0 || minVal > 59)
+            if (!int.TryParse(hora.Split(':' )[1], out var minVal) || minVal < 0 || minVal > 59)
                 minVal = 0;
+
+            if (File.Exists(filePath))
+            {
+                ConfigBackupService.BackupSingleFile(filePath);
+            }
 
             var doc = new XmlDocument();
             var root = doc.CreateElement("Agendamentos");
             doc.AppendChild(root);
 
-            // IDs padrão 3|7|9
+            // IDs padrao 3|7|9
             var ids = new[] { "3", "7", "9" };
 
             foreach (var id in ids)
             {
                 var ag = doc.CreateElement("Agendamento");
 
-                AddComment(ag, "SEPARE OS IDENTIFICADORES POR '|' Ex: 3|7|9");
+                AddComment(ag, "SEPARE OS IDENTIFICADORES POR \'|\' Ex: 3|7|9");
                 AddElement(ag, "EquipamentoId", id);
 
                 AddComment(ag, "VALOR ENTRE 0 E 23");
@@ -200,10 +240,10 @@ public static class ControleAcessoAgendamentoHelper
     }
 
     /// <summary>
-    /// Lê o XML existente e extrai os valores atuais para usar como padrão.
-    /// Retorna tupla com: lista de IDs, hora, minuto, diasSemana, obterArquivos, enviarArquivos.
+    /// Le o XML existente e extrai os valores atuais para usar como padrao.
+    /// Retorna tupla com: lista de IDs, hora, minuto, diasSemana, obterArquivos, enviarArquivos, isLegacy.
     /// </summary>
-    private static (List<string> ids, int hora, int minuto, string diasSemana, bool obterArquivos, bool enviarArquivos)
+    private static (List<string> ids, int hora, int minuto, string diasSemana, bool obterArquivos, bool enviarArquivos, bool isLegacy)
         ReadExistingValues(string filePath)
     {
         var defaultIds = new List<string>();
@@ -212,7 +252,7 @@ public static class ControleAcessoAgendamentoHelper
         var defaultDiasSemana = "0|1|2|3|4|5|6";
         var defaultObter = true;
         var defaultEnviar = true;
-        // Ativo sempre true por padrão (definição do sistema)
+        var isLegacy = false;
 
         try
         {
@@ -220,48 +260,88 @@ public static class ControleAcessoAgendamentoHelper
             doc.Load(filePath);
 
             var root = doc.DocumentElement;
-            if (root?.Name != "Agendamentos")
-                return (defaultIds, defaultHora, defaultMinuto, defaultDiasSemana, defaultObter, defaultEnviar);
+            if (root == null)
+                return (defaultIds, defaultHora, defaultMinuto, defaultDiasSemana, defaultObter, defaultEnviar, false);
 
-            var agendamentos = root.SelectNodes("Agendamento");
-            if (agendamentos == null || agendamentos.Count == 0)
-                return (defaultIds, defaultHora, defaultMinuto, defaultDiasSemana, defaultObter, defaultEnviar);
+            if (root.Name.Equals("Agendamento", StringComparison.OrdinalIgnoreCase))
+            {
+                isLegacy = true;
+                var singleEquipId = root.SelectSingleNode("IdsEquipamentos")?.InnerText?.Trim()
+                                 ?? root.SelectSingleNode("EquipamentoId")?.InnerText?.Trim()
+                                 ?? root.SelectSingleNode("EquipamentoIDs")?.InnerText?.Trim()
+                                 ?? root.SelectSingleNode("IDs")?.InnerText?.Trim();
+                if (!string.IsNullOrEmpty(singleEquipId))
+                {
+                    defaultIds.AddRange(singleEquipId.Split('|', StringSplitOptions.RemoveEmptyEntries));
+                }
 
-            // Extrai IDs de todos os Agendamento
+                var horaInicioStr = root.SelectSingleNode("HoraInicio")?.InnerText?.Trim();
+                if (!string.IsNullOrEmpty(horaInicioStr) && int.TryParse(horaInicioStr.Split(':' )[0], out var hi))
+                    defaultHora = hi;
+
+                var parts = horaInicioStr?.Split(':' );
+                if (parts?.Length > 1 && int.TryParse(parts[1], out var mi))
+                    defaultMinuto = mi;
+
+                var ds = root.SelectSingleNode("DiasSemana")?.InnerText?.Trim();
+                if (!string.IsNullOrEmpty(ds))
+                    defaultDiasSemana = ds;
+
+                if (bool.TryParse(root.SelectSingleNode("ObterArquivos")?.InnerText?.Trim(), out var obter))
+                    defaultObter = obter;
+
+                if (bool.TryParse(root.SelectSingleNode("EnviarArquivos")?.InnerText?.Trim(), out var enviar))
+                    defaultEnviar = enviar;
+
+                return (defaultIds, defaultHora, defaultMinuto, defaultDiasSemana, defaultObter, defaultEnviar, isLegacy);
+            }
+
+            var agendamentos = root.SelectNodes("Agendamento")?.Cast<XmlNode>().ToList() ?? [];
+
             foreach (XmlNode node in agendamentos)
             {
                 if (node is not XmlElement ag) continue;
 
-                var equipId = ag.SelectSingleNode("EquipamentoId")?.InnerText?.Trim();
+                var equipId = ag.SelectSingleNode("EquipamentoId")?.InnerText?.Trim()
+                           ?? ag.SelectSingleNode("IdsEquipamentos")?.InnerText?.Trim()
+                           ?? ag.SelectSingleNode("EquipamentoIDs")?.InnerText?.Trim()
+                           ?? ag.SelectSingleNode("IDs")?.InnerText?.Trim();
                 if (!string.IsNullOrEmpty(equipId))
-                    defaultIds.Add(equipId);
+                {
+                    defaultIds.AddRange(equipId.Split('|', StringSplitOptions.RemoveEmptyEntries));
+                }
             }
 
-            // Extrai valores do primeiro Agendamento (todos compartilham o mesmo padrão)
-            var first = (XmlElement)agendamentos[0]!;
+            var first = (agendamentos.Count > 0 && agendamentos[0] is XmlElement el) ? el : root;
 
-            if (int.TryParse(first.SelectSingleNode("Hora")?.InnerText?.Trim(), out var hora))
+            var horaStr = first.SelectSingleNode("Hora")?.InnerText?.Trim();
+            if (int.TryParse(horaStr, out var hora))
+            {
                 defaultHora = hora;
+            }
 
-            if (int.TryParse(first.SelectSingleNode("Minuto")?.InnerText?.Trim(), out var minuto))
+            var minStr = first.SelectSingleNode("Minuto")?.InnerText?.Trim();
+            if (int.TryParse(minStr, out var minuto))
+            {
                 defaultMinuto = minuto;
+            }
 
-            var ds = first.SelectSingleNode("DiasSemana")?.InnerText?.Trim();
-            if (!string.IsNullOrEmpty(ds))
-                defaultDiasSemana = ds;
+            var dias = first.SelectSingleNode("DiasSemana")?.InnerText?.Trim();
+            if (!string.IsNullOrEmpty(dias))
+                defaultDiasSemana = dias;
 
-            if (bool.TryParse(first.SelectSingleNode("ObterArquivos")?.InnerText?.Trim(), out var obter))
-                defaultObter = obter;
+            if (bool.TryParse(first.SelectSingleNode("ObterArquivos")?.InnerText?.Trim(), out var obterVal))
+                defaultObter = obterVal;
 
-            if (bool.TryParse(first.SelectSingleNode("EnviarArquivos")?.InnerText?.Trim(), out var enviar))
-                defaultEnviar = enviar;
+            if (bool.TryParse(first.SelectSingleNode("EnviarArquivos")?.InnerText?.Trim(), out var enviarVal))
+                defaultEnviar = enviarVal;
         }
         catch
         {
             // Se falhar ao ler, usa defaults
         }
 
-        return (defaultIds, defaultHora, defaultMinuto, defaultDiasSemana, defaultObter, defaultEnviar);
+        return (defaultIds, defaultHora, defaultMinuto, defaultDiasSemana, defaultObter, defaultEnviar, isLegacy);
     }
 
     private static void AddComment(XmlElement parent, string text)

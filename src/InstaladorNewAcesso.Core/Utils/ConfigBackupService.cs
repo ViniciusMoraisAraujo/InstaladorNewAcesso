@@ -1,23 +1,41 @@
-using System.Globalization;
+ï»¿using System.Globalization;
 using InstaladorNewAcesso.Core.Services;
 
 namespace InstaladorNewAcesso.Core.Utils;
 
 /// <summary>
-/// Serviço para backup e restauração de arquivos de configuração
-/// (.config, .ini, .xml) antes de reinstalar uma aplicação MSI.
+/// Servico para backup e restauracao de arquivos de configuracao
+/// (.config, .ini, .xml, .json) antes de reinstalar ou reconfigurar modulos.
 /// </summary>
 public static class ConfigBackupService
 {
-    private static readonly string[] ConfigPatterns = ["*.config", "*.ini", "*.xml"];
+    private static readonly string[] ConfigPatterns = ["*.config", "*.ini", "*.xml", "*.json"];
 
     /// <summary>
-    /// Faz backup de todos os arquivos de configuração (.config, .ini, .xml)
-    /// do diretório de destino para uma pasta temporária.
+    /// Faz copia de backup (.bak) de um arquivo individual com timestamp antes de modifica-lo.
     /// </summary>
-    /// <param name="targetDirectory">Diretório onde a aplicação está instalada.</param>
-    /// <param name="msiName">Nome do MSI (usado para identificar o backup).</param>
-    /// <returns>Caminho da pasta de backup, ou null se nenhum config foi encontrado.</returns>
+    public static string? BackupSingleFile(string filePath)
+    {
+        if (!File.Exists(filePath))
+            return null;
+
+        try
+        {
+            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
+            var bakPath = $"{filePath}.{timestamp}.bak";
+            File.Copy(filePath, bakPath, overwrite: true);
+            return bakPath;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Faz backup de todos os arquivos de configuracao (.config, .ini, .xml, .json)
+    /// do diretorio de destino para uma pasta temporaria.
+    /// </summary>
     public static string? Backup(string targetDirectory, string msiName)
     {
         if (!Directory.Exists(targetDirectory))
@@ -31,7 +49,7 @@ public static class ConfigBackupService
 
         if (configFiles.Count == 0)
         {
-            UIScope.WriteMessage($"   [gray][[INFO]] Nenhum arquivo de configuração encontrado em: {MarkupHelper.Escape(targetDirectory)}[/]");
+            UIScope.WriteMessage($"   [gray][[INFO]] Nenhum arquivo de configuracao encontrado em: {MarkupHelper.Escape(targetDirectory)}[/]");
             return null;
         }
 
@@ -47,12 +65,12 @@ public static class ConfigBackupService
             File.Copy(file, destPath, overwrite: true);
         }
 
-        UIScope.WriteMessage($"   [green][[OK]][/] Backup de {configFiles.Count} arquivo(s) de configuração: [cyan]{MarkupHelper.Escape(backupDir)}[/]");
+        UIScope.WriteMessage($"   [green][[OK]][/] Backup de {configFiles.Count} arquivo(s) de configuracao: [cyan]{MarkupHelper.Escape(backupDir)}[/]");
         return backupDir;
     }
 
     /// <summary>
-    /// Restaura os arquivos de configuração do backup de volta ao diretório de destino.
+    /// Restaura os arquivos de configuracao do backup de volta ao diretorio de destino.
     /// </summary>
     public static void Restore(string? backupPath, string targetDirectory)
     {
@@ -80,7 +98,7 @@ public static class ConfigBackupService
             }
         }
 
-        UIScope.WriteMessage($"   [green][[OK]][/] Restaurado(s) {restored} arquivo(s) de configuração.");
+        UIScope.WriteMessage($"   [green][[OK]][/] Restaurado(s) {restored} arquivo(s) de configuracao.");
     }
 
     /// <summary>

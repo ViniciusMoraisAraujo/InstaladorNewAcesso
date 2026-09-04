@@ -1,4 +1,4 @@
-﻿using InstaladorNewAcesso.Abstractions.Models;
+using InstaladorNewAcesso.Abstractions.Models;
 
 namespace InstaladorNewAcesso.Core.Services;
 
@@ -23,6 +23,7 @@ public class MsiScanner
             ["ConexBridge"] = p => p.ConexBridge,
             ["ConnectionRecord"] = p => p.ConnectionRecord,
             ["Controller"] = p => p.Controller,
+            ["Controlador"] = p => p.Controller,
             ["ControllerOffline"] = p => p.ControllerOffline,
             ["VisitAuthorization"] = p => p.VisitAuthorization,
             ["Win"] = p => p.Win,
@@ -36,7 +37,8 @@ public class MsiScanner
             ["WinService_Ex"] = p => p.ControllerOfflineWinServiceEx,
             ["WinService_In"] = p => p.ControllerOfflineWinServiceIn,
 
-            ["OffLine"] = p => Path.Combine(p.NewAcessoRoot, "OffLine")
+            ["OffLine"] = p => Path.Combine(p.NewAcessoRoot, "OffLine"),
+            ["Offline"] = p => Path.Combine(p.NewAcessoRoot, "OffLine")
         };
 
         _fileNameMapping = new Dictionary<string, Func<InstallationPaths, string>>(StringComparer.OrdinalIgnoreCase)
@@ -53,6 +55,7 @@ public class MsiScanner
             ["Task"] = p => p.Task,
             ["Fabricantes"] = p => p.Fabricantes,
             ["Win"] = p => p.Win,
+            ["Controlador"] = p => p.Controller,
             ["Controller"] = p => p.Controller
         };
     }
@@ -68,10 +71,9 @@ public class MsiScanner
         {
             var folderName = Path.GetFileName(subDir);
 
-            if (folderName.Equals("SQLServer", StringComparison.OrdinalIgnoreCase) ||
-                folderName.Equals("Oracle", StringComparison.OrdinalIgnoreCase))
+            if (IsDatabaseFolder(folderName))
             {
-                if (folderName.Equals(_dbChoice, StringComparison.OrdinalIgnoreCase))
+                if (MatchesDatabaseChoice(folderName, _dbChoice))
                     tasks.AddRange(ProcessDirectory(subDir));
                 continue;
             }
@@ -84,8 +86,7 @@ public class MsiScanner
         {
             var fileName = Path.GetFileNameWithoutExtension(msiPath);
 
-            if (fileName.Contains("UI", StringComparison.OrdinalIgnoreCase) ||
-                fileName.Contains("DS", StringComparison.OrdinalIgnoreCase))
+            if (IsWebAppMsi(fileName))
                 continue;
 
             var targetDir = ResolveTargetDirectory(msiPath, fileName);
@@ -99,6 +100,34 @@ public class MsiScanner
         return tasks;
     }
 
+    public static bool IsDatabaseFolder(string folderName) =>
+        folderName.Contains("SQLServer", StringComparison.OrdinalIgnoreCase) ||
+        folderName.Contains("SQL Server", StringComparison.OrdinalIgnoreCase) ||
+        folderName.Contains("Oracle", StringComparison.OrdinalIgnoreCase);
+
+    public static bool MatchesDatabaseChoice(string folderName, string dbChoice)
+    {
+        if (dbChoice.Equals("SQLServer", StringComparison.OrdinalIgnoreCase))
+        {
+            return (folderName.Contains("SQLServer", StringComparison.OrdinalIgnoreCase) ||
+                    folderName.Contains("SQL Server", StringComparison.OrdinalIgnoreCase)) &&
+                   !folderName.Contains("Oracle", StringComparison.OrdinalIgnoreCase);
+        }
+        if (dbChoice.Equals("Oracle", StringComparison.OrdinalIgnoreCase))
+        {
+            return folderName.Contains("Oracle", StringComparison.OrdinalIgnoreCase) &&
+                   !folderName.Contains("SQLServer", StringComparison.OrdinalIgnoreCase) &&
+                   !folderName.Contains("SQL Server", StringComparison.OrdinalIgnoreCase);
+        }
+        return false;
+    }
+
+    private static bool IsWebAppMsi(string fileName) =>
+        fileName.Contains("UI", StringComparison.OrdinalIgnoreCase) ||
+        fileName.Contains("DS", StringComparison.OrdinalIgnoreCase) ||
+        fileName.Contains("WebDataService", StringComparison.OrdinalIgnoreCase) ||
+        fileName.Contains("WebApp", StringComparison.OrdinalIgnoreCase);
+
     private List<MsiInstallationModel> ProcessDirectory(string directory)
     {
         var tasks = new List<MsiInstallationModel>();
@@ -108,8 +137,7 @@ public class MsiScanner
         {
             var fileName = Path.GetFileNameWithoutExtension(msiPath);
 
-            if (fileName.Contains("UI", StringComparison.OrdinalIgnoreCase) ||
-                fileName.Contains("DS", StringComparison.OrdinalIgnoreCase))
+            if (IsWebAppMsi(fileName))
                 continue;
 
             var targetDir = ResolveTargetDirectory(msiPath, fileName);

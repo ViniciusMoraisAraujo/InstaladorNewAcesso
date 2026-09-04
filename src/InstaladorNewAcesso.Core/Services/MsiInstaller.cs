@@ -6,7 +6,7 @@ namespace InstaladorNewAcesso.Core.Services;
 
 public class MsiInstaller
 {
-    public async Task<bool> InstallAsync(MsiInstallationModel model)
+    public async Task<bool> InstallAsync(MsiInstallationModel model, RollbackManager? rollbackManager = null)
     {
         ArgumentNullException.ThrowIfNull(model);
         try
@@ -31,9 +31,19 @@ public class MsiInstaller
 
             if (success)
             {
-                var configDir = model.TargetDirectory;
+                rollbackManager?.Push(async () =>
+                {
+                    UIScope.WriteMessage($"   [yellow][[ROLLBACK]] Revertendo MSI:[/] {MarkupHelper.Escape(model.MsiPath)}");
+                    var uninstalled = await MsiUninstaller.UninstallByMsiPathAsync(model.MsiPath);
+                    if (!uninstalled)
+                    {
+                        MsiUninstaller.RemoveTargetDirectory(model.TargetDirectory);
+                    }
+                });
 
-                // Só chama cada config helper se o arquivo de configuração correspondente existir
+                var configDir = ConfigHelperBase.NormalizeDirectoryPath(model.TargetDirectory);
+
+                // SÃ³ chama cada config helper se o arquivo de configuraÃ§Ã£o correspondente existir
                 if (File.Exists(Path.Combine(configDir, "PrimeAcesso.ConnectionRecord.exe.config")))
                     ConnectionRecordConfigHelper.UpdateConfigAfterInstall(configDir);
 
@@ -44,17 +54,27 @@ public class MsiInstaller
                 }
 
                 if (File.Exists(Path.Combine(configDir, "NewAcesso.Controlador.Watchdog.exe.config")) ||
+                    File.Exists(Path.Combine(configDir, "NewAcesso.Controlador.WatchDog.exe.config")) ||
                     File.Exists(Path.Combine(configDir, "NewAcesso.Controlador.Ws.exe.config")))
                     CoreWsConfigHelper.UpdateConfigsAfterInstall(configDir);
 
-                if (File.Exists(Path.Combine(configDir, "PrimeAcesso.Task.exe.config")))
+                if (File.Exists(Path.Combine(configDir, "PrimeAcesso.Task.exe.config")) ||
+                    File.Exists(Path.Combine(configDir, "PrimeAcesso.Controller.Task.exe.config")))
                     TaskConfigHelper.UpdateConfigAfterInstall(configDir);
 
-                if (File.Exists(Path.Combine(configDir, "PrimeAcesso.Controller.StandAloneEx.exe.config")))
+                if (File.Exists(Path.Combine(configDir, "PrimeAcesso.Controller.StandAloneEx.exe.config")) ||
+                    File.Exists(Path.Combine(configDir, "PrimeAcesso.StandAloneEx.exe.config")))
                     StandAloneExConfigHelper.UpdateConfigAfterInstall(configDir);
 
-                if (File.Exists(Path.Combine(configDir, "PrimeAcesso.Controller.StandAloneIm.exe.config")))
+                if (File.Exists(Path.Combine(configDir, "PrimeAcesso.Controller.StandAloneIm.exe.config")) ||
+                    File.Exists(Path.Combine(configDir, "PrimeAcesso.Controller.StandAloneIn.exe.config")) ||
+                    File.Exists(Path.Combine(configDir, "PrimeAcesso.StandAloneIm.exe.config")) ||
+                    File.Exists(Path.Combine(configDir, "PrimeAcesso.StandAloneIn.exe.config")))
                     StandAloneImConfigHelper.UpdateConfigAfterInstall(configDir);
+
+                if (File.Exists(Path.Combine(configDir, "PrimeAcesso.Win.exe.config")) ||
+                    File.Exists(Path.Combine(configDir, "PrimeAcesso.Win.ini")))
+                    WinConfigHelper.UpdateConfig(configDir);
             }
 
             return success;

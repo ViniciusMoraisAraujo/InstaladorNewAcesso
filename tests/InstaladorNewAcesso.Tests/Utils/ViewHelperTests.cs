@@ -1,4 +1,4 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using InstaladorNewAcesso.Core.Utils;
 
 namespace InstaladorNewAcesso.Tests.Utils;
@@ -109,5 +109,97 @@ public class ViewHelperTests
         var result = ViewHelper.ParseIndices("1,2", 1);
 
         result.Should().ContainSingle().Which.Should().Be(0);
+    }
+
+    // ── IsVersionRoot ────────────────────────
+
+    [Fact]
+    public void IsVersionRoot_WhenDirectoryContainsMsi_ReturnsTrue()
+    {
+        var temp = Path.Combine(Path.GetTempPath(), "ViewHelperTests_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(temp);
+            File.Create(Path.Combine(temp, "app.msi")).Dispose();
+
+            ViewHelper.IsVersionRoot(temp).Should().BeTrue();
+        }
+        finally
+        {
+            if (Directory.Exists(temp)) Directory.Delete(temp, true);
+        }
+    }
+
+    [Fact]
+    public void IsVersionRoot_WhenDirectoryContainsComponentFolders_ReturnsTrue()
+    {
+        var temp = Path.Combine(Path.GetTempPath(), "ViewHelperTests_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(temp, "Controlador"));
+            Directory.CreateDirectory(Path.Combine(temp, "AutoAtendimento"));
+
+            ViewHelper.IsVersionRoot(temp).Should().BeTrue();
+        }
+        finally
+        {
+            if (Directory.Exists(temp)) Directory.Delete(temp, true);
+        }
+    }
+
+    [Fact]
+    public void IsVersionRoot_WhenDirectoryContainsCompositeDbFolders_ReturnsTrue()
+    {
+        var temp = Path.Combine(Path.GetTempPath(), "ViewHelperTests_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(temp, "SQLServer - Web - WebDataService - Win"));
+
+            ViewHelper.IsVersionRoot(temp).Should().BeTrue();
+        }
+        finally
+        {
+            if (Directory.Exists(temp)) Directory.Delete(temp, true);
+        }
+    }
+
+    [Fact]
+    public void IsVersionRoot_WhenDirectoryContainsOnlyVersionSubfolders_ReturnsFalse()
+    {
+        var temp = Path.Combine(Path.GetTempPath(), "ViewHelperTests_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(temp, "PrimeAcesso_5.11"));
+            Directory.CreateDirectory(Path.Combine(temp, "PrimeAcesso_5.10"));
+
+            ViewHelper.IsVersionRoot(temp).Should().BeFalse();
+        }
+        finally
+        {
+            if (Directory.Exists(temp)) Directory.Delete(temp, true);
+        }
+    }
+
+    // ── FindExistingInstallerDirectory ───────
+
+    [Fact]
+    public void FindExistingInstallerDirectory_WhenInstallersExists_ResolvesAlternative()
+    {
+        var temp = Path.Combine(Path.GetTempPath(), "ViewHelperTests_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var installersDir = Path.Combine(temp, "Installers");
+            Directory.CreateDirectory(installersDir);
+
+            // Tenta procurar Instaladores (em português)
+            var target = Path.Combine(temp, "Instaladores");
+            var resolved = ViewHelper.FindExistingInstallerDirectory(target);
+
+            resolved.Should().Be(installersDir);
+        }
+        finally
+        {
+            if (Directory.Exists(temp)) Directory.Delete(temp, true);
+        }
     }
 }

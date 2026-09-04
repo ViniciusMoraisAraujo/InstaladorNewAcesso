@@ -1,4 +1,4 @@
-﻿#pragma warning disable CA1416
+#pragma warning disable CA1416
 
 using System.Security.Principal;
 using InstaladorNewAcesso.Console.Services;
@@ -27,8 +27,21 @@ try
 {
     var ui = new ConsoleUIService();
     InstaladorNewAcesso.Core.Services.UIScope.Current = ui;
-    var view = new MainMenuView(ui);
-    await view.ExecuteAsync();
+    
+    var argsList = Environment.GetCommandLineArgs().ToList();
+    var unattendedIndex = argsList.IndexOf("--unattended");
+    
+    if (unattendedIndex >= 0 && unattendedIndex + 1 < argsList.Count)
+    {
+        var configPath = argsList[unattendedIndex + 1];
+        var runner = new UnattendedRunner(ui);
+        await runner.RunAsync(configPath);
+    }
+    else
+    {
+        var view = new MainMenuView(ui);
+        await view.ExecuteAsync();
+    }
 }
 catch (Exception ex)
 {

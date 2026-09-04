@@ -1,4 +1,4 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using InstaladorNewAcesso.Abstractions.Models;
 using InstaladorNewAcesso.Core.Services;
 
@@ -464,24 +464,112 @@ public class MsiScannerTests : IDisposable
     }
 
     // ============================================================
-    //  Edge cases — UI/DS MSIs in subfolders are also skipped
+    //  PrimeAcesso 5.11 structure & Brazilian Portuguese Folder tests
     // ============================================================
 
     [Fact]
-    public void Scan_ShouldSkipUIandDSMsIs_InSubfolders()
+    public void Scan_ControladorFolder_MapsToController()
     {
-        var subDir = Path.Combine(_tempRoot, "WebApps");
-        Directory.CreateDirectory(subDir);
-        File.Create(Path.Combine(subDir, "WebAppUI.msi")).Dispose();
-        File.Create(Path.Combine(subDir, "WebAppDS.msi")).Dispose();
-        // Add a valid one
-        File.Create(Path.Combine(subDir, "NormalApp.msi")).Dispose();
+        var controladorDir = Path.Combine(_tempRoot, "Controlador");
+        Directory.CreateDirectory(controladorDir);
+        File.Create(Path.Combine(controladorDir, "Controlador.msi")).Dispose();
 
         var scanner = new MsiScanner(_paths, DbChoice, _tempRoot);
-
         var result = scanner.Scan();
 
         result.Should().ContainSingle();
+        result[0].TargetDirectory.Should().Be(_paths.Controller);
+    }
+
+    [Fact]
+    public void Scan_OffLineFolder_MapsToOffLine()
+    {
+        var offlineDir = Path.Combine(_tempRoot, "OffLine");
+        Directory.CreateDirectory(offlineDir);
+        File.Create(Path.Combine(offlineDir, "OffLineService.msi")).Dispose();
+
+        var scanner = new MsiScanner(_paths, DbChoice, _tempRoot);
+        var result = scanner.Scan();
+
+        result.Should().ContainSingle();
+        result[0].TargetDirectory.Should().Be(Path.Combine(_paths.NewAcessoRoot, "OffLine"));
+    }
+
+    [Fact]
+    public void Scan_CompositeSqlServerFolder_WhenDbChoiceIsSqlServer_IncludesWinMsiAndSkipsWebApps()
+    {
+        var sqlServerDir = Path.Combine(_tempRoot, "SQLServer - Web - WebDataService - Win");
+        Directory.CreateDirectory(sqlServerDir);
+        File.Create(Path.Combine(sqlServerDir, "Win.msi")).Dispose();
+        File.Create(Path.Combine(sqlServerDir, "WebAppDS.msi")).Dispose();
+        File.Create(Path.Combine(sqlServerDir, "WebAppUI.msi")).Dispose();
+
+        var scanner = new MsiScanner(_paths, "SQLServer", _tempRoot);
+        var result = scanner.Scan();
+
+        result.Should().ContainSingle();
+        result[0].TargetDirectory.Should().Be(_paths.Win);
+    }
+
+    [Fact]
+    public void Scan_CompositeOracleFolder_WhenDbChoiceIsSqlServer_IsSkipped()
+    {
+        var oracleDir = Path.Combine(_tempRoot, "Oracle - Web - WebDataService - Win");
+        Directory.CreateDirectory(oracleDir);
+        File.Create(Path.Combine(oracleDir, "Win.msi")).Dispose();
+
+        var scanner = new MsiScanner(_paths, "SQLServer", _tempRoot);
+        var result = scanner.Scan();
+
+        result.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Scan_FullPrimeAcesso511Structure_ScansAllModulesCorrectly()
+    {
+        // Cria estrutura idêntica à versão 5.11
+        var primeRoot = Path.Combine(_tempRoot, "PrimeAcesso_5.11");
+        Directory.CreateDirectory(Path.Combine(primeRoot, "AutoAtendimento"));
+        Directory.CreateDirectory(Path.Combine(primeRoot, "ConexBridge"));
+        Directory.CreateDirectory(Path.Combine(primeRoot, "ConnectionRecord"));
+        Directory.CreateDirectory(Path.Combine(primeRoot, "Controlador"));
+        Directory.CreateDirectory(Path.Combine(primeRoot, "ControleAcesso"));
+        Directory.CreateDirectory(Path.Combine(primeRoot, "Fabricantes"));
+        Directory.CreateDirectory(Path.Combine(primeRoot, "OffLine"));
+        Directory.CreateDirectory(Path.Combine(primeRoot, "Oracle - Web - WebDataService - Win"));
+        Directory.CreateDirectory(Path.Combine(primeRoot, "SQLServer - Web - WebDataService - Win"));
+        Directory.CreateDirectory(Path.Combine(primeRoot, "Task"));
+        Directory.CreateDirectory(Path.Combine(primeRoot, "VisitAuthorization"));
+
+        File.Create(Path.Combine(primeRoot, "AutoAtendimento", "AutoAtendimento.msi")).Dispose();
+        File.Create(Path.Combine(primeRoot, "ConexBridge", "ConexBridge.msi")).Dispose();
+        File.Create(Path.Combine(primeRoot, "ConnectionRecord", "ConnectionRecord.msi")).Dispose();
+        File.Create(Path.Combine(primeRoot, "Controlador", "Controlador.msi")).Dispose();
+        File.Create(Path.Combine(primeRoot, "ControleAcesso", "ControleAcesso.msi")).Dispose();
+        File.Create(Path.Combine(primeRoot, "Fabricantes", "Fabricantes.msi")).Dispose();
+        File.Create(Path.Combine(primeRoot, "OffLine", "StandAloneEx.msi")).Dispose();
+        File.Create(Path.Combine(primeRoot, "Oracle - Web - WebDataService - Win", "Win.msi")).Dispose();
+        File.Create(Path.Combine(primeRoot, "SQLServer - Web - WebDataService - Win", "Win.msi")).Dispose();
+        File.Create(Path.Combine(primeRoot, "SQLServer - Web - WebDataService - Win", "WebAppDS.msi")).Dispose();
+        File.Create(Path.Combine(primeRoot, "SQLServer - Web - WebDataService - Win", "WebAppUI.msi")).Dispose();
+        File.Create(Path.Combine(primeRoot, "Task", "Task.msi")).Dispose();
+        File.Create(Path.Combine(primeRoot, "VisitAuthorization", "VisitAuthorization.msi")).Dispose();
+
+        var scanner = new MsiScanner(_paths, "SQLServer", primeRoot);
+        var result = scanner.Scan();
+
+        // 10 MSIs regulares (excluindo Oracle e os 2 WebApps)
+        result.Should().HaveCount(10);
+        result.Should().Contain(m => m.TargetDirectory == _paths.AutoAtendimento);
+        result.Should().Contain(m => m.TargetDirectory == _paths.ConexBridge);
+        result.Should().Contain(m => m.TargetDirectory == _paths.ConnectionRecord);
+        result.Should().Contain(m => m.TargetDirectory == _paths.Controller);
+        result.Should().Contain(m => m.TargetDirectory == _paths.ControleAcesso);
+        result.Should().Contain(m => m.TargetDirectory == _paths.Fabricantes);
+        result.Should().Contain(m => m.TargetDirectory == _paths.ControllerOfflineWinServiceEx);
+        result.Should().Contain(m => m.TargetDirectory == _paths.Win);
+        result.Should().Contain(m => m.TargetDirectory == _paths.Task);
+        result.Should().Contain(m => m.TargetDirectory == _paths.VisitAuthorization);
     }
 
     public void Dispose()

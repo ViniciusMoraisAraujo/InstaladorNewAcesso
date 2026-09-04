@@ -1,4 +1,4 @@
-﻿namespace InstaladorNewAcesso.Abstractions.Interfaces;
+namespace InstaladorNewAcesso.Abstractions.Interfaces;
 
 public interface IIisInstaller
 {
@@ -10,6 +10,7 @@ public interface IIisInstaller
     Task<Dictionary<string, bool>> CheckAppPoolsExistAsync(string[] names);
     Task<Dictionary<string, bool>> CheckSitesExistAsync(string[] names);
     Task<(Dictionary<string, bool> AppPools, Dictionary<string, bool> Sites)> CheckAppPoolsAndSitesExistAsync(string[] poolNames, string[] siteNames);
+    Task<bool> GrantDirectoryPermissionsAsync(string path);
     Task<bool> RemoveSiteAsync(string name);
     Task<bool> RemoveAppPoolAsync(string name);
 }

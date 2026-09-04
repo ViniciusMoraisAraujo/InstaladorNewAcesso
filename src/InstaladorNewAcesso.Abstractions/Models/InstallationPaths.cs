@@ -1,9 +1,12 @@
-﻿namespace InstaladorNewAcesso.Abstractions.Models;
+namespace InstaladorNewAcesso.Abstractions.Models;
 
 public class InstallationPaths
 {
-    public string BasePath { get; private set; }
-    public string InstallationPath => Path.Combine(BasePath, "Instaladores");
+    public string BasePath { get; }
+    private readonly string? _customInstallationPath;
+
+    public string InstallationPath => _customInstallationPath ?? Path.Combine(BasePath, "Instaladores");
+
     public string NewAcessoRoot => Path.Combine(BasePath, "NewAcesso");
 
     public string AutoAtendimento => Path.Combine(NewAcessoRoot, "AutoAtendimento");
@@ -25,9 +28,16 @@ public class InstallationPaths
     public string WebAppDS => Path.Combine(NewAcessoRoot, "WebAppDS");
     public string WebAppUI => Path.Combine(NewAcessoRoot, "WebAppUI");
     public string WebAppUIFabricantes => Path.Combine(WebAppUI, "Fabricantes");
-    public InstallationPaths(string basePath)
+
+    public string AutoAtendimentoWebAPI => Path.Combine(AutoAtendimento, "WebAPI");
+    public string AutoAtendimentoWebAPP => Path.Combine(AutoAtendimento, "WebAPP");
+    public string ConnectionRecordDb => Path.Combine(ConnectionRecord, "DataBase", "NewAcessoConnection.s3db");
+
+    public InstallationPaths(string basePath, string? customInstallationPath = null)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(basePath);
         BasePath = basePath;
+        _customInstallationPath = customInstallationPath;
     }
 
     public IEnumerable<string> GetBaseFolders() =>

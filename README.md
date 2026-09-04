@@ -3,8 +3,9 @@
   <p><strong>Instalador automatizado da suíte de produtos NewAcesso para Windows Server e Desktop</strong></p>
   <p>
     <img src="https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet" alt=".NET 10">
-    <img src="https://img.shields.io/badge/WinForms-10.0-0078D6?logo=windows" alt="WinForms">
-    <img src="https://img.shields.io/badge/tests-513_✓-009632" alt="513 tests passing">
+    <img src="https://img.shields.io/badge/CLI-Spectre.Console-0078D6" alt="Spectre.Console">
+    <img src="https://img.shields.io/badge/tests-500+_✓-009632" alt="500+ tests passing">
+    <img src="https://img.shields.io/badge/architecture-Clean%2FOnion-blue" alt="Clean Architecture">
     <img src="https://img.shields.io/badge/license-Proprietary-red" alt="License">
   </p>
 </div>
@@ -13,22 +14,21 @@
 
 ## 📖 Sobre
 
-O **Instalador NewAcesso** automatiza a instalação completa da plataforma NewAcesso em servidores Windows — desde a configuração do IIS e ativação de Features do Windows até a instalação de MSIs, WebApps, criação de diretórios e agendamento de tarefas.
+O **Instalador NewAcesso** é uma aplicação de terminal interativo moderna e robusta para automatizar a instalação, configuração e manutenção de servidores Windows da plataforma NewAcesso — gerenciando a ativação de Recursos do Windows (IIS, ASP.NET, MSMQ), criação da árvore de diretórios, configuração do IIS, instalação de pacotes MSI, configuração de WebApps e agendamento de tarefas.
 
-### ✨ Recursos
+### ✨ Recursos Principais
 
 | Recurso | Descrição |
 |---------|-----------|
-| 🖥️ **Dual Interface** | Modo Gráfico (WinForms) e Terminal (Console) compartilhando a mesma lógica |
-| 📥 **Download Automático** | Baixa instaladores do Google Drive via API v3 |
-| ⚙️ **Features Windows** | Ativa 32 componentes do Windows (IIS, .NET, ASP.NET, MSMQ, etc.) |
-| 📂 **Diretórios** | Cria estrutura completa de pastas do NewAcesso |
-| 🌐 **IIS** | Configura AppPools e Sites para WebAppDS e WebAppUI |
-| 📦 **MSI** | Instala dezenas de MSIs com mapeamento inteligente de pastas |
-| 🌍 **WebApps** | Instala WebApps (UI + DS) com fallback Admin Install |
-| 📅 **Tarefas** | Agenda tarefas do Windows |
-| 🗑️ **Desinstalação** | Remove todos os componentes com auditoria completa |
-| 📊 **Painel de Status** | Progresso em tempo real e sumário de erros inline |
+| 🖥️ **Terminal Interativo Rico** | Interface CLI moderna com cores, spinners, barras de progresso e menus com [Spectre.Console](https://spectreconsole.net/) |
+| ⚙️ **Recursos do Windows** | Ativação automatizada de 32 componentes do Windows (IIS, .NET 3.5/4.x, ASP.NET, MSMQ, WAS, WCF) via DISM e ServerManager |
+| 📂 **Gestão de Diretórios** | Criação, verificação de integridade e idempotência de toda a estrutura de pastas do NewAcesso |
+| 🌐 **Automação IIS** | Criação e configuração de AppPools e Sites para WebAppDS e WebAppUI |
+| 📦 **Instalador de MSIs** | Mapeamento inteligente de pastas de destino e instalação silenciosa com log detalhado |
+| 🌍 **Gestão de WebApps** | Instalação de WebApps com suporte a extração e fallback de instalação administrativa |
+| 📅 **Tarefas Agendadas** | Criação e configuração de tarefas do Windows Task Scheduler |
+| 🗑️ **Desinstalação & Auditoria** | Desinstalação completa e registro de auditoria via `AuditLogger` |
+| 📊 **Painel de Status** | Feedback em tempo real com rastreamento detalhado de passos e relatórios |
 
 ---
 
@@ -36,179 +36,112 @@ O **Instalador NewAcesso** automatiza a instalação completa da plataforma NewA
 
 ### Pré-requisitos
 
-- **Sistema Operacional:** Windows 10+ ou Windows Server 2016+
-- **.NET Runtime:** .NET 10.0 (incluído no self-contained publish)
+- **Sistema Operacional:** Windows 10+ ou Windows Server 2016+ (64-bit)
+- **.NET Runtime:** .NET 10.0 (incluso no executável *self-contained*)
 - **Permissões:** Executar como **Administrador**
 
-### Download
+### Execução
 
-> ⚠️ O instalador **precisa ser executado como Administrador**. Sem privilégios de admin, o programa exibe uma mensagem de erro e encerra.
+> ⚠️ O instalador **precisa ser executado como Administrador**. Sem privilégios elevados, o programa exibe uma mensagem de erro e é finalizado.
 
-> 💡 O download de instaladores do Google Drive requer uma **chave de API do Google** (API Key).
-> Você precisará informá-la na tela de Download durante a execução.
-> [Saiba como obter sua chave](https://developers.google.com/drive/api/guides/enable-drive-api).
+1. Baixe o executável da versão mais recente ou compile o projeto.
+2. Abra o terminal elevado e execute:
+   ```powershell
+   .\InstaladorNewAcesso.Console.exe
+   ```
 
-1. Faça o download do executável mais recente na seção [Releases](../../releases)
-2. Extraia o arquivo para uma pasta de sua preferência
-3. Execute `InstaladorNewAcesso.Launcher.exe` — ou diretamente:
-   - `InstaladorNewAcesso.WinForms.exe` (modo gráfico)
-   - `InstaladorNewAcesso.Console.exe` (modo terminal)
+### Compilação a partir do Código-Fonte
 
-### Compilando do Código Fonte
-
-```bash
+```powershell
 # Restaurar dependências
 dotnet restore
 
-# Compilar toda a solução
+# Compilar toda a solução (.slnx)
 dotnet build
 
-# Publicar como single-file
-dotnet publish -c Release -o ./publish
-
-# Executar testes
+# Executar a suíte de testes automatizados
 dotnet test
-```
 
-> A solution usa `.slnx` (formato XML simplificado). Certifique-se de usar .NET 10 SDK ou superior.
+# Publicar como executável único autônomo (Self-Contained)
+powershell -ExecutionPolicy Bypass -File ./scripts/publish.ps1
+```
 
 ---
 
-## 🧭 Navegação
+## 🧭 Menu de Navegação
 
-O instalador segue um fluxo linear de configuração:
+O instalador conta com um menu interativo completo:
 
 ```
-Main Menu
-  │
-  ├── 1. 📥 Download           ← Baixar instaladores do Google Drive
-  ├── 2. ⚙️ Recursos Windows    ← Ativar features (IIS, .NET, etc.)
-  ├── 3. 📂 Diretórios          ← Criar estrutura de pastas
-  ├── 4. 🌐 IIS                 ← Configurar AppPools e Sites
-  ├── 5. 📦 MSI                 ← Instalar MSIs do sistema
-  ├── 6. 🌍 WebApp              ← Instalar WebApps (UI + DS)
-  ├── 7. 📅 Agendamento         ← Configurar tarefas agendadas
-  └── 8. 🗑️ Desinstalação       ← Remover todos os componentes
+╔══════════════════════════════════════════════════════╗
+║               INSTALADOR NEWACESSO                   ║
+╚══════════════════════════════════════════════════════╝
+  1. ⚙️  Recursos Windows     ← Ativar 32 features (IIS, .NET, MSMQ, etc.)
+  2. 📂 Diretórios           ← Criar estrutura de pastas do NewAcesso
+  3. 🌐 IIS                  ← Configurar AppPools e Sites WebApp
+  4. 📦 MSI                  ← Instalar pacotes MSI do sistema
+  5. 🌍 WebApp               ← Instalar e configurar WebApps (UI + DS)
+  6. 📅 Agendamento          ← Configurar tarefas agendadas do Windows
+  7. 🗑️  Desinstalação        ← Desinstalar componentes e auditar remoções
+  0. 🚪 Sair
 ```
-
-Cada etapa pode ser acessada individualmente ou em sequência, com botão **← Voltar** disponível para navegação entre telas.
 
 ---
 
-## 🏗️ Arquitetura
+## 🏗️ Arquitetura da Solução
 
-O projeto segue uma arquitetura em camadas (Onion/Clean Architecture) com **5 projetos + 1 de testes**:
+A solução adota **Clean / Onion Architecture** com separação estrita de responsabilidades em **3 camadas principais + 1 projeto de testes**:
 
 ```
 src/
-├── 📁 InstaladorNewAcesso.Abstractions/   # Interfaces + Models (0 dependências)
-├── 📁 InstaladorNewAcesso.Core/           # Lógica de negócio
-├── 📁 InstaladorNewAcesso.WinForms/       # Interface gráfica (WinForms)
-├── 📁 InstaladorNewAcesso.Console/        # Interface terminal (Spectre.Console)
-└── 📁 InstaladorNewAcesso.Launcher/       # Ponto de entrada unificado
+├── 📁 InstaladorNewAcesso.Abstractions/   # Interfaces (IUIService, IProcessExecutor, etc.) e Models
+├── 📁 InstaladorNewAcesso.Core/           # Lógica de negócio, scanners, instaladores e helpers
+└── 📁 InstaladorNewAcesso.Console/        # Interface de terminal (Spectre.Console) e views
+tests/
+└── 📁 InstaladorNewAcesso.Tests/          # Suíte de testes unitários e de integração
 ```
 
 ```
-┌─────────────────────────────────────┐
-│  WinForms / Console (UI)            │  → Conhece Abstractions + Core
-├─────────────────────────────────────┤
-│  Core (Lógica de Negócio)           │  → Conhece Abstractions
-├─────────────────────────────────────┤
-│  Abstractions (Contracts/Models)    │  → Conhece nada
-└─────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────┐
+│  InstaladorNewAcesso.Console (UI / Ponto de Entrada)      │  → Depende de Abstractions e Core
+├───────────────────────────────────────────────────────────┤
+│  InstaladorNewAcesso.Core (Lógica de Negócio)             │  → Depende de Abstractions
+├───────────────────────────────────────────────────────────┤
+│  InstaladorNewAcesso.Abstractions (Contratos e Modelos)   │  → 0 dependências externas
+└───────────────────────────────────────────────────────────┘
 ```
 
-> 📖 Para detalhes completos da arquitetura, consulte [`ARCHITECTURE.md`](ARCHITECTURE.md) — que cobre decisões arquiteturais, modelos de dados, sistema de temas, navegação, ciclo de vida IView, oportunidades de melhoria e sugestões futuras.
+### Projetos
 
-### Projetos em Detalhe
-
-| Projeto | Tipo | Função |
-|---------|------|--------|
-| **Abstractions** | Library | Interfaces (`IView`, `IUIService`, `IProcessExecutor`, etc.) e Models (`InstallationPaths`, `MsiInstallationModel`, `StepStatus`, etc.) |
-| **Core** | Library | Serviços (`MsiInstaller`, `WebAppInstaller`, `GoogleDriveDownloader`), scanners, utilitários IIS, config helpers, factory de features Windows |
-| **WinForms** | WinExe | 11 UserControls, `MainForm`, `NavigationManager`, tema escuro (`ThemeColors`+`ThemeFonts`+`UIStyles`) |
-| **Console** | Exe | `ConsoleUIService` com Spectre.Console, Views no estilo terminal |
-| **Launcher** | WinExe | Diálogo inicial para escolher entre modo Gráfico e Terminal |
+| Projeto | Tipo | Responsabilidade |
+|---------|------|------------------|
+| **`InstaladorNewAcesso.Abstractions`** | Class Library | Define interfaces (`IUIService`, `IProcessExecutor`, `IIisInstaller`, `IFeatureInstaller`), modelos (`InstallationPaths`, `MsiInstallModel`, `StepState`) e enums. |
+| **`InstaladorNewAcesso.Core`** | Class Library | Implementa lógica de scanners (`MsiScanner`, `WebAppScanner`), instaladores (`MsiInstaller`, `WebAppInstaller`), configurações e utilitários. |
+| **`InstaladorNewAcesso.Console`** | Console Executable | Entrypoint da aplicação, implementação de `ConsoleUIService` e views interativas do terminal. |
+| **`InstaladorNewAcesso.Tests`** | Test Project | Suíte de testes unitários e de integração com xUnit, FluentAssertions e NSubstitute. |
 
 ---
 
-## 🎨 Tema
+## 📚 Documentação e Guias
 
-A interface WinForms usa um **tema escuro profissional** centralizado:
+Toda a documentação técnica, operacional e arquitetural está disponível no repositório:
 
-```css
-Background     #12121E  │  TextPrimary    #FFFFFF
-Surface        #1E1E32  │  TextAccent     #00FFFF  (ciano)
-SurfaceHover   #32324A  │  TextMuted      #646478
-InputBg        #1E1E32  │  Success        #009632
-Primary        #0078D7  │  Danger         #B42828
-```
-
-- **ThemeColors** — 30+ constantes de cor em um único arquivo
-- **ThemeFonts** — 14 definições de fonte com cache lazy (prevenindo vazamento GDI)
-- **UIStyles** — 20+ métodos factory (`CreateTitle()`, `CreatePrimaryButton()`, `CreateTextBox()`, etc.)
+| Documento | Descrição |
+|---|---|
+| [**`AGENTS.md`**](AGENTS.md) | Diretrizes e regras essenciais para Agentes de IA e engenheiros |
+| [**`ARCHITECTURE.md`**](ARCHITECTURE.md) | Documento aprofundado de arquitetura, fluxo de dados e decisões técnicas |
+| [**`docs/setup-guide.md`**](docs/setup-guide.md) | Guia completo de configuração de ambiente, compilação e publicação |
+| [**`docs/features-and-msi-mapping.md`**](docs/features-and-msi-mapping.md) | Mapeamento dos 32 recursos Windows, pacotes MSI e diretórios |
+| [**`docs/troubleshooting.md`**](docs/troubleshooting.md) | Guia de diagnóstico de erros, logs do MSI e soluções operacionais |
 
 ---
 
-## 🧪 Testes
+## 🧪 Estratégia de Testes
 
-O projeto possui **513 testes unitários** (xUnit + FluentAssertions + NSubstitute):
+A solução possui ampla cobertura de testes cobrindo regras de negócio, scanners, criação de arquivos e integrações:
 
-```bash
-dotnet test
-# Result: Pass: 513, Fail: 0, Skip: 0 (~9s)
-```
-
-| Área | Testes | Status |
-|------|--------|--------|
-| Models | ~30 | ✅ |
-| Services | ~120 | ✅ |
-| Utils | ~250 | ✅ |
-| Configurations | ~40 | ✅ |
-| Controls | ~34 | ✅ |
-| Integration | ~9 | ✅ |
-
----
-
-## 🛠️ Tecnologias
-
-| Tecnologia | Versão | Uso |
-|------------|--------|-----|
-| .NET | 10.0 | Runtime e SDK |
-| Windows Forms | 10.0 | Interface gráfica |
-| Spectre.Console | 0.57 | Interface de terminal (Console) |
-| xUnit | 2.9 | Framework de testes |
-| FluentAssertions | 8.10 | Asserções encadeadas |
-| NSubstitute | 5.3 | Mocking |
-| Coverlet | 10.0 | Cobertura de código |
-
----
-
-## 📁 Estrutura de Diretórios do NewAcesso
-
-O instalador cria e gerencia a seguinte estrutura:
-
-```
-<BasePath>/
-├── Instaladores/          ← MSIs baixados do Google Drive
-└── NewAcesso/
-    ├── AutoAtendimento/
-    ├── ConexBridge/
-    ├── ConnectionRecord/
-    ├── Controller/
-    │   ├── ControleAcesso/
-    │   ├── CoreWs/
-    │   ├── Fabricantes/
-    │   └── Task/
-    ├── ControllerOffline/
-    │   ├── Arquivos/
-    │   ├── WinService_Ex/
-    │   └── WinService_In/
-    ├── VisitAuthorization/
-    ├── WebAppDS/           ← Porta 8080
-    ├── WebAppUI/           ← Porta 8081
-    │   └── Fabricantes/
-    └── Win/
+```powershell
+dotnet test --verbosity normal
 ```
 
 ---
@@ -216,37 +149,4 @@ O instalador cria e gerencia a seguinte estrutura:
 ## 📄 Licença
 
 **Propriedade da NewAcesso.**  
-Código interno — não distribuir sem autorização.
-
----
-
-## 🤝 Contribuindo
-
-1. Faça um fork do projeto
-2. Crie uma branch: `git checkout -b feature/nome-da-feature`
-3. Commit suas mudanças: `git commit -m 'feat: adiciona nova funcionalidade'`
-4. Push: `git push origin feature/nome-da-feature`
-5. Abra um Pull Request
-
-### Convenções de Código
-
-- **Nullable habilitado** em toda a solution
-- **Análise de código:** `latest-Recommended` com `EnforceCodeStyleInBuild`
-- **Testes:** xUnit com `[Fact]`, asserções com FluentAssertions
-- **Nomenclatura de testes:** `MethodName_Scenario_ExpectedResult`
-- **Cores/Fontes:** nunca hardcoded — sempre via `ThemeColors`/`ThemeFonts`
-
----
-
-## 📚 Documentação
-
-| Documento | Descrição |
-|-----------|-----------|
-| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Arquitetura completa, decisões, pontos fortes, melhorias e sugestões futuras |
-| `README.md` (este) | Visão geral e guia rápido |
-
----
-
-<div align="center">
-  <sub>NewAcesso — Instalador Automatizado | Julho 2026</sub>
-</div>
+Código interno para distribuição e uso autorizado.

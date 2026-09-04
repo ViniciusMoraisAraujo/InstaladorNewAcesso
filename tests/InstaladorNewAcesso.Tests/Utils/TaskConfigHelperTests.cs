@@ -4,12 +4,6 @@ using InstaladorNewAcesso.Core.Utils;
 
 namespace InstaladorNewAcesso.Tests.Utils;
 
-/// <summary>
-/// Testes para TaskConfigHelper. Como o método UpdateConfigAfterInstall
-/// chama AnsiConsole.Ask (input do usuário), testamos apenas os caminhos
-/// que retornam antes de chegar ao prompt: arquivo não encontrado e
-/// estrutura de diretórios inválida.
-/// </summary>
 public class TaskConfigHelperTests : IDisposable
 {
     private readonly string _tempRoot;
@@ -65,6 +59,53 @@ public class TaskConfigHelperTests : IDisposable
         var result = TaskConfigHelper.UpdateConfigAfterInstall(dir);
 
         result.Should().BeFalse();
+    }
+
+    [Fact]
+    public void UpdateConfig_WithAlternateConfigName_UpdatesSuccessfully()
+    {
+        var dir = Path.Combine(_tempRoot, "NewAcesso", "Controller", "Task");
+        Directory.CreateDirectory(dir);
+        var configPath = Path.Combine(dir, "PrimeAcesso.Controller.Task.exe.config");
+        CreateMinimalConfig(configPath);
+
+        var result = TaskConfigHelper.UpdateConfig(dir, idConexao: "2", fabricante: "Hikvision", horaExclusao: "18:30");
+
+        result.Should().BeTrue();
+
+        var doc = new XmlDocument();
+        doc.Load(configPath);
+        var idNode = doc.SelectSingleNode("//add[@key=\'ID_Conexao_NewAcessoConnectionRecord\']") as XmlElement;
+        idNode.Should().NotBeNull();
+        idNode!.GetAttribute("value").Should().Be("2");
+
+        var fabNode = doc.SelectSingleNode("//add[@key=\'FabricanteEquipamentoFacial\']") as XmlElement;
+        fabNode.Should().NotBeNull();
+        fabNode!.GetAttribute("value").Should().Be("Hikvision");
+
+        var horaNode = doc.SelectSingleNode("//add[@key=\'HoraExecucaoExclusaoFacial\']") as XmlElement;
+        horaNode.Should().NotBeNull();
+        horaNode!.GetAttribute("value").Should().Be("18:30");
+    }
+
+    [Fact]
+    public void UpdateConfig_WithTrailingSlash_ResolvesDbPathCorrectly()
+    {
+        var dir = Path.Combine(_tempRoot, "NewAcesso", "Controller", "Task");
+        Directory.CreateDirectory(dir);
+        var configPath = Path.Combine(dir, "PrimeAcesso.Task.exe.config");
+        CreateMinimalConfig(configPath);
+
+        var result = TaskConfigHelper.UpdateConfig(dir + @"\");
+
+        result.Should().BeTrue();
+
+        var doc = new XmlDocument();
+        doc.Load(configPath);
+        var dbNode = doc.SelectSingleNode("//add[@key=\'PathDataSource_NewAcessoConnectionRecord\']") as XmlElement;
+        dbNode.Should().NotBeNull();
+        var expectedDb = Path.Combine(_tempRoot, "NewAcesso", "ConnectionRecord", "DataBase", "NewAcessoConnection.s3db");
+        dbNode!.GetAttribute("value").Should().Be(expectedDb);
     }
 
     public void Dispose()

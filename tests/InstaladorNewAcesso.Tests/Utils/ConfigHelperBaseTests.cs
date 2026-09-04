@@ -6,6 +6,20 @@ namespace InstaladorNewAcesso.Tests.Utils;
 
 public class ConfigHelperBaseTests
 {
+    // ── NormalizeDirectoryPath ─────────────────────────────────────
+
+    [Theory]
+    [InlineData(@"C:\SoftPrime\NewAcesso\", @"C:\SoftPrime\NewAcesso")]
+    [InlineData(@"C:\SoftPrime\NewAcesso/", @"C:\SoftPrime\NewAcesso")]
+    [InlineData(@"C:\SoftPrime\NewAcesso", @"C:\SoftPrime\NewAcesso")]
+    [InlineData(null, "")]
+    [InlineData("", "")]
+    public void NormalizeDirectoryPath_RemovesTrailingSlashes(string? input, string expected)
+    {
+        var result = ConfigHelperBase.NormalizeDirectoryPath(input);
+        result.Should().Be(expected);
+    }
+
     // ── EnsureAppSettings ──────────────────────────────────────────
 
     [Fact]
@@ -50,7 +64,7 @@ public class ConfigHelperBaseTests
 
         result.Should().BeSameAs(existing);
         Assert.NotNull(doc.DocumentElement);
-        doc.DocumentElement.ChildNodes.Count.Should().Be(1); // não duplica
+        doc.DocumentElement.ChildNodes.Count.Should().Be(1); // nao duplica
     }
 
     // ── SetKey ─────────────────────────────────────────────────────
@@ -63,7 +77,7 @@ public class ConfigHelperBaseTests
 
         ConfigHelperBase.SetKey(appSettings, "TestKey", "TestValue");
 
-        var add = appSettings.SelectSingleNode("add[@key='TestKey']") as XmlElement;
+        var add = appSettings.SelectSingleNode("add[@key=\'TestKey\']") as XmlElement;
         Assert.NotNull(add);
         add.GetAttribute("value").Should().Be("TestValue");
     }
@@ -77,9 +91,33 @@ public class ConfigHelperBaseTests
 
         ConfigHelperBase.SetKey(appSettings, "TestKey", "NewValue");
 
-        var add = appSettings.SelectSingleNode("add[@key='TestKey']") as XmlElement;
+        var add = appSettings.SelectSingleNode("add[@key=\'TestKey\']") as XmlElement;
         Assert.NotNull(add);
         add.GetAttribute("value").Should().Be("NewValue");
+    }
+
+    [Fact]
+    public void SetKey_OnDuplicateKeys_RemovesDuplicatesAndUpdatesPrimary()
+    {
+        var doc = CreateDocWithAppSettings();
+        var appSettings = ConfigHelperBase.EnsureAppSettings(doc);
+
+        var add1 = doc.CreateElement("add");
+        add1.SetAttribute("key", "DupKey");
+        add1.SetAttribute("value", "Val1");
+        appSettings.AppendChild(add1);
+
+        var add2 = doc.CreateElement("add");
+        add2.SetAttribute("key", "DupKey");
+        add2.SetAttribute("value", "Val2");
+        appSettings.AppendChild(add2);
+
+        ConfigHelperBase.SetKey(appSettings, "DupKey", "UpdatedVal");
+
+        var nodes = appSettings.SelectNodes("add[@key=\'DupKey\']");
+        Assert.NotNull(nodes);
+        nodes.Count.Should().Be(1);
+        ((XmlElement)nodes[0]!).GetAttribute("value").Should().Be("UpdatedVal");
     }
 
     [Fact]
@@ -91,9 +129,9 @@ public class ConfigHelperBaseTests
 
         ConfigHelperBase.SetKey(appSettings, "TestKey", "SameValue");
 
-        var adds = appSettings.SelectNodes("add[@key='TestKey']");
+        var adds = appSettings.SelectNodes("add[@key=\'TestKey\']");
         Assert.NotNull(adds);
-        adds.Count.Should().Be(1); // não duplica
+        adds.Count.Should().Be(1); // nao duplica
     }
 
     [Fact]
@@ -105,7 +143,7 @@ public class ConfigHelperBaseTests
 
         ConfigHelperBase.SetKey(appSettings, "testkey", "Updated");
 
-        var add = appSettings.SelectSingleNode("add[@key='TESTKEY']") as XmlElement;
+        var add = appSettings.SelectSingleNode("add[@key=\'TESTKEY\']") as XmlElement;
         Assert.NotNull(add);
         add.GetAttribute("value").Should().Be("Updated");
     }

@@ -1,0 +1,36 @@
+name: Release Builder
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build & Publish Single-File
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Run Tests
+      run: dotnet test --configuration Release --no-restore
+
+    - name: Publish Executable
+      run: powershell -ExecutionPolicy Bypass -File ./scripts/publish.ps1 -Configuration Release -SelfContained $true
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: InstaladorNewAcesso-Win64
+        path: dist/InstaladorNewAcesso.Console.exe
+        if-no-files-found: error

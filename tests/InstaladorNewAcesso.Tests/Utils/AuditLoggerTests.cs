@@ -1,8 +1,10 @@
-﻿using FluentAssertions;
+using FluentAssertions;
+using InstaladorNewAcesso.Abstractions.Models;
 using InstaladorNewAcesso.Core.Utils;
 
 namespace InstaladorNewAcesso.Tests.Utils;
 
+[Collection("AuditLoggerTests")]
 public class AuditLoggerTests : IDisposable
 {
     private readonly string _basePath;
@@ -24,11 +26,31 @@ public class AuditLoggerTests : IDisposable
     [Fact]
     public void Start_LogFileContainsHeader()
     {
-        AuditLogger.Start(_basePath);
+        AuditLogger.Start(_basePath, AuditType.Uninstall);
+        var logPath = AuditLogger.CurrentLogPath!;
+        AuditLogger.Finish();
 
-        var content = File.ReadAllText(AuditLogger.CurrentLogPath!);
+        var content = File.ReadAllText(logPath);
         content.Should().Contain("AUDITORIA DE DESINSTALAÇÃO");
         content.Should().Contain(_basePath);
+    }
+
+    [Fact]
+    public void Start_WithDifferentAuditTypes_GeneratesCorrectPrefixAndHeader()
+    {
+        // Install
+        AuditLogger.Start(_basePath, AuditType.Install);
+        var installPath = AuditLogger.CurrentLogPath!;
+        AuditLogger.Finish();
+        Path.GetFileName(installPath).Should().StartWith("install_audit_");
+        File.ReadAllText(installPath).Should().Contain("AUDITORIA DE INSTALAÇÃO");
+
+        // Maintenance
+        AuditLogger.Start(_basePath, AuditType.Maintenance);
+        var maintPath = AuditLogger.CurrentLogPath!;
+        AuditLogger.Finish();
+        Path.GetFileName(maintPath).Should().StartWith("maintenance_audit_");
+        File.ReadAllText(maintPath).Should().Contain("AUDITORIA DE MANUTENÇÃO");
     }
 
     [Fact]
@@ -38,11 +60,12 @@ public class AuditLoggerTests : IDisposable
         AuditLogger.Log("Test", "op1", true);
         AuditLogger.Log("Test", "op2", false);
 
-        // Novo Start deve zerar
+        // Novo Start deve fechar e zerar
         AuditLogger.Start(_basePath);
 
+        var logPath = AuditLogger.CurrentLogPath!;
         AuditLogger.Finish();
-        var content = File.ReadAllText(AuditLogger.CurrentLogPath!);
+        var content = File.ReadAllText(logPath);
         content.Should().Contain("Total: 0");
     }
 
@@ -51,8 +74,10 @@ public class AuditLoggerTests : IDisposable
     {
         AuditLogger.Start(_basePath);
         AuditLogger.Log("OperacaoTeste", "ItemTeste", true);
+        var logPath = AuditLogger.CurrentLogPath!;
+        AuditLogger.Finish();
 
-        var content = File.ReadAllText(AuditLogger.CurrentLogPath!);
+        var content = File.ReadAllText(logPath);
         content.Should().Contain("OperacaoTeste");
         content.Should().Contain("ItemTeste");
         content.Should().Contain("OK");
@@ -62,6 +87,7 @@ public class AuditLoggerTests : IDisposable
     public void Log_WithoutStart_DoesNothing()
     {
         // Should not throw when called without Start
+        AuditLogger.Finish();
         AuditLogger.Log("Test", "item", true);
     }
 
@@ -71,8 +97,10 @@ public class AuditLoggerTests : IDisposable
         AuditLogger.Start(_basePath);
         AuditLogger.Log("Op1", "Item1", true);
         AuditLogger.Log("Op2", "Item2", false);
+        var logPath = AuditLogger.CurrentLogPath!;
+        AuditLogger.Finish();
 
-        var content = File.ReadAllText(AuditLogger.CurrentLogPath!);
+        var content = File.ReadAllText(logPath);
         content.Should().Contain("✅");
         content.Should().Contain("❌");
     }
@@ -82,8 +110,10 @@ public class AuditLoggerTests : IDisposable
     {
         AuditLogger.Start(_basePath);
         AuditLogger.Separator("Minha Seção");
+        var logPath = AuditLogger.CurrentLogPath!;
+        AuditLogger.Finish();
 
-        var content = File.ReadAllText(AuditLogger.CurrentLogPath!);
+        var content = File.ReadAllText(logPath);
         content.Should().Contain("Minha Seção");
     }
 
@@ -91,20 +121,25 @@ public class AuditLoggerTests : IDisposable
     public void Separator_WithoutStart_DoesNothing()
     {
         // Should not throw
+        AuditLogger.Finish();
         AuditLogger.Separator("Teste");
     }
 
     [Fact]
-    public void Finish_WritesFooterWithStats()
+    public void Finish_WritesFooterWithStatsAndResetsState()
     {
         AuditLogger.Start(_basePath);
         AuditLogger.Log("Op1", "Item1", true);
         AuditLogger.Log("Op2", "Item2", true);
         AuditLogger.Log("Op3", "Item3", false);
 
+        var logPath = AuditLogger.CurrentLogPath;
         AuditLogger.Finish();
 
-        var content = File.ReadAllText(AuditLogger.CurrentLogPath!);
+        // Após Finish, CurrentLogPath deve ser null
+        AuditLogger.CurrentLogPath.Should().BeNull();
+
+        var content = File.ReadAllText(logPath!);
         content.Should().Contain("RESUMO FINAL");
         content.Should().Contain("Total: 3");
         content.Should().Contain("Sucessos: 2");
@@ -126,26 +161,11 @@ public class AuditLoggerTests : IDisposable
         AuditLogger.CurrentLogPath.Should().NotBeNull();
         Path.GetFileName(AuditLogger.CurrentLogPath).Should().StartWith("uninstall_audit_");
         Path.GetExtension(AuditLogger.CurrentLogPath).Should().Be(".txt");
-    }
-
-    [Fact]
-    public void CurrentLogPath_BeforeStart_ReturnsNull()
-    {
-        // Since Start was not called in this test (fresh state)
-        // Note: depends on test execution order — use a separate check
-        var path = AuditLogger.CurrentLogPath;
-
-        // Can't guarantee null since other tests might have set it.
-        // Just verify it doesn't throw.
+        AuditLogger.Finish();
     }
 
     public void Dispose()
     {
-        // Cleanup log file if any
-        if (AuditLogger.CurrentLogPath != null && File.Exists(AuditLogger.CurrentLogPath))
-        {
-            try { File.Delete(AuditLogger.CurrentLogPath); }
-            catch { /* cleanup on best-effort */ }
-        }
+        AuditLogger.Finish();
     }
 }

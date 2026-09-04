@@ -1,4 +1,4 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using InstaladorNewAcesso.Abstractions.Models;
 using InstaladorNewAcesso.Core.Services;
 
@@ -398,26 +398,47 @@ public class WebAppScannerTests : IDisposable
     }
 
     // ============================================================
-    //  Edge cases — both DB folders present, only matching scanned
+    //  Edge cases — composite DB folder names (PrimeAcesso 5.11)
     // ============================================================
 
     [Fact]
-    public void Scan_BothSqlAndOracleFolders_OnlyMatchingScanned()
+    public void Scan_CompositeDbFolders_ScansOnlyMatchingDatabaseWebApps()
     {
-        var sqlDir = Path.Combine(_tempRoot, "SQLServer");
+        var sqlDir = Path.Combine(_tempRoot, "SQLServer - Web - WebDataService - Win");
         Directory.CreateDirectory(sqlDir);
-        File.Create(Path.Combine(sqlDir, "SqlDS.msi")).Dispose();
+        File.Create(Path.Combine(sqlDir, "WebAppDS.msi")).Dispose();
+        File.Create(Path.Combine(sqlDir, "WebAppUI.msi")).Dispose();
+        File.Create(Path.Combine(sqlDir, "Win.msi")).Dispose();
 
-        var oracleDir = Path.Combine(_tempRoot, "Oracle");
+        var oracleDir = Path.Combine(_tempRoot, "Oracle - Web - WebDataService - Win");
         Directory.CreateDirectory(oracleDir);
-        File.Create(Path.Combine(oracleDir, "OracleDS.msi")).Dispose();
+        File.Create(Path.Combine(oracleDir, "WebAppDS.msi")).Dispose();
+        File.Create(Path.Combine(oracleDir, "WebAppUI.msi")).Dispose();
 
         var scanner = new WebAppScanner(_paths, "SQLServer", _tempRoot);
 
         var result = scanner.Scan();
 
+        result.Should().HaveCount(2);
+        result.Should().Contain(r => r.SiteName == "WebAppDS" && r.MsiPath.Contains("SQLServer"));
+        result.Should().Contain(r => r.SiteName == "WebAppUI" && r.MsiPath.Contains("SQLServer"));
+        result.Should().NotContain(r => r.MsiPath.Contains("Oracle"));
+    }
+
+    [Fact]
+    public void Scan_WebDataServiceNaming_DetectedAsWebAppDS()
+    {
+        var sqlDir = Path.Combine(_tempRoot, "SQLServer - Web - WebDataService - Win");
+        Directory.CreateDirectory(sqlDir);
+        File.Create(Path.Combine(sqlDir, "WebDataService.msi")).Dispose();
+
+        var scanner = new WebAppScanner(_paths, "SQLServer", _tempRoot);
+        var result = scanner.Scan();
+
         result.Should().ContainSingle();
-        result[0].MsiPath.Should().Contain("SqlDS");
+        result[0].SiteName.Should().Be("WebAppDS");
+        result[0].TargetDirectory.Should().Be(_paths.WebAppDS);
+        result[0].Port.Should().Be(8080);
     }
 
     public void Dispose()

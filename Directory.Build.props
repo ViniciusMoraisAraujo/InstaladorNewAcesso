@@ -6,7 +6,7 @@
        ════════════════════════════════════════════════ -->
 
   <PropertyGroup>
-    <!-- .NET target padrão (WinForms sobrescreve no próprio csproj) -->
+    <!-- .NET target padrão -->
     <TargetFramework>net10.0</TargetFramework>
 
     <!-- Nullable reference types (todos os projetos) -->

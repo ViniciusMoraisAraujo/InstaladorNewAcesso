@@ -1,4 +1,4 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using InstaladorNewAcesso.Abstractions.Models;
 
 namespace InstaladorNewAcesso.Tests.Models;
@@ -149,10 +149,29 @@ public class InstallationPathsTests
     }
 
     [Fact]
+    public void Paths_WithCustomInstallationPath_ShouldUseCustomPath()
+    {
+        var paths = new InstallationPaths(@"C:\SoftPrime", @"D:\Custom\Installers");
+
+        paths.InstallationPath.Should().Be(@"D:\Custom\Installers");
+    }
+
+    [Fact]
     public void Paths_ShouldUseTrailingBasePathCorrectly()
     {
         var paths = new InstallationPaths(@"C:\SoftPrime\");
 
         paths.InstallationPath.Should().Be(@"C:\SoftPrime\Instaladores");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Constructor_WithNullOrWhiteSpace_ShouldThrowArgumentException(string? invalidBasePath)
+    {
+        var act = () => new InstallationPaths(invalidBasePath!);
+
+        act.Should().Throw<ArgumentException>();
     }
 }

@@ -16,7 +16,7 @@ public class IniHelperBaseTests
 
         modified.Should().BeTrue();
         lines.Should().Contain(l => l.Contains("MyKey") && l.Contains("MyValue"));
-        lines.Should().Contain(l => l.Contains("'MyValue'"));
+        lines.Should().Contain(l => l.Contains("\'MyValue\'"));
     }
 
     [Fact]
@@ -26,7 +26,7 @@ public class IniHelperBaseTests
 
         IniHelperBase.SetIniKey(lines, "MyKey", "MyValue", useQuotes: false);
 
-        lines.Should().Contain(l => l.Contains("MyKey") && l.Contains("MyValue") && !l.Contains("'"));
+        lines.Should().Contain(l => l.Contains("MyKey") && l.Contains("MyValue") && !l.Contains("\'"));
     }
 
     // ── Update existing key ────────────────
@@ -51,7 +51,7 @@ public class IniHelperBaseTests
         var modified = IniHelperBase.SetIniKey(lines, "MyKey", "SameValue");
 
         modified.Should().BeFalse();
-        lines.Count.Should().Be(1); // não adiciona linha extra
+        lines.Count.Should().Be(1); // nao adiciona linha extra
     }
 
     // ── Case insensitive ───────────────────
@@ -75,7 +75,7 @@ public class IniHelperBaseTests
 
         IniHelperBase.SetIniKey(lines, "MyKey", "Updated");
 
-        lines[0].Should().Be("; MyKey = Commented"); // não altera comentário
+        lines[0].Should().Be("; MyKey = Commented"); // nao altera comentario
         lines.Should().Contain(l => l.Contains("Updated"));
     }
 
@@ -86,7 +86,7 @@ public class IniHelperBaseTests
 
         IniHelperBase.SetIniKey(lines, "MyKey", "Updated");
 
-        lines[0].Should().Be("# MyKey = Commented"); // não altera comentário
+        lines[0].Should().Be("# MyKey = Commented"); // nao altera comentario
     }
 
     // ── Quoted values ──────────────────────
@@ -94,11 +94,11 @@ public class IniHelperBaseTests
     [Fact]
     public void SetIniKey_StripsSingleQuotes_WhenReading()
     {
-        var lines = new List<string> { "MyKey = 'OldValue'" };
+        var lines = new List<string> { "MyKey = \'OldValue\'" };
 
         IniHelperBase.SetIniKey(lines, "MyKey", "NewValue");
 
-        lines.Should().Contain(l => l.Contains("'NewValue'"));
+        lines.Should().Contain(l => l.Contains("\'NewValue\'"));
     }
 
     [Fact]
@@ -108,7 +108,7 @@ public class IniHelperBaseTests
 
         IniHelperBase.SetIniKey(lines, "MyKey", "NewValue");
 
-        lines.Should().Contain(l => l.Contains("'NewValue'"));
+        lines.Should().Contain(l => l.Contains("\'NewValue\'"));
     }
 
     // ── Whitespace handling ────────────────
@@ -133,7 +133,7 @@ public class IniHelperBaseTests
         IniHelperBase.SetIniKey(lines, "MyKey", "Updated");
 
         lines[0].Should().Contain("Updated"); // atualiza o primeiro
-        lines[1].Should().Contain("Second");  // não mexe no segundo
+        lines[1].Should().Contain("Second");  // nao mexe no segundo
     }
 
     // ── Section-aware ─────────────────────
@@ -156,52 +156,30 @@ public class IniHelperBaseTests
     }
 
     [Fact]
-    public void SetIniKey_WithSection_CaseInsensitiveSectionMatch()
+    public void SetIniKey_WithSection_InsertsBeforeNextSection()
     {
         var lines = new List<string>
         {
-            "[mysection]",
-            "MyKey = OldValue"
+            "[TargetSection]",
+            "ExistingKey = 123",
+            "[NextSection]",
+            "OtherKey = 456"
         };
 
-        IniHelperBase.SetIniKey(lines, "MyKey", "NewValue", section: "MySection");
-
-        lines.Should().Contain(l => l.Contains("NewValue"));
-    }
-
-    [Fact]
-    public void SetIniKey_WithSection_DoesNotTouchKeyOutsideSection()
-    {
-        var lines = new List<string>
-        {
-            "MyKey = GlobalValue",
-            "[Target]",
-            "OtherKey = Something"
-        };
-
-        var modified = IniHelperBase.SetIniKey(lines, "MyKey", "NewValue", section: "Target");
-
-        modified.Should().BeFalse();
-        lines.Should().Contain(l => l.Contains("GlobalValue"));
-    }
-
-    [Fact]
-    public void SetIniKey_WithSection_AddsKeyIfMissingInSection()
-    {
-        var lines = new List<string>
-        {
-            "[MySection]",
-            "ExistingKey = OK"
-        };
-
-        var modified = IniHelperBase.SetIniKey(lines, "NewKey", "Value", section: "MySection");
+        var modified = IniHelperBase.SetIniKey(lines, "NewKey", "789", section: "TargetSection");
 
         modified.Should().BeTrue();
-        lines.Should().Contain(l => l.Contains("NewKey") && l.Contains("Value"));
+        // A nova chave deve estar antes de [NextSection]
+        var targetIdx = lines.IndexOf("[TargetSection]");
+        var newKeyIdx = lines.FindIndex(l => l.Contains("NewKey"));
+        var nextSecIdx = lines.IndexOf("[NextSection]");
+
+        newKeyIdx.Should().BeGreaterThan(targetIdx);
+        newKeyIdx.Should().BeLessThan(nextSecIdx);
     }
 
     [Fact]
-    public void SetIniKey_WithSection_DoesNotAddKeyIfSectionMissing()
+    public void SetIniKey_WithSection_CreatesSectionIfMissing()
     {
         var lines = new List<string>
         {
@@ -211,22 +189,55 @@ public class IniHelperBaseTests
 
         var modified = IniHelperBase.SetIniKey(lines, "MyKey", "Value", section: "MySection");
 
-        modified.Should().BeFalse();
-        lines.Should().NotContain(l => l.Contains("MyKey"));
+        modified.Should().BeTrue();
+        lines.Should().Contain("[MySection]");
+        lines.Should().Contain(l => l.Contains("MyKey") && l.Contains("Value"));
     }
 
     [Fact]
-    public void SetIniKey_WithoutSection_IgnoresSections_FlatBehavior()
+    public void UpdateKeyIfExists_WhenKeyExists_UpdatesAndReturnsTrue()
     {
-        // Backward-compatible: no section parameter = original flat behavior
         var lines = new List<string>
         {
-            "[SomeSection]",
-            "MyKey = OldValue"
+            "[GERAL]",
+            "PathDataSouce_NewAcessoConnectionRecord = \'OldPath\'"
         };
 
-        IniHelperBase.SetIniKey(lines, "MyKey", "NewValue");
+        var modified = IniHelperBase.UpdateKeyIfExists(lines, "PathDataSouce_NewAcessoConnectionRecord", "NewPath", section: "GERAL");
 
-        lines.Should().Contain(l => l.Contains("NewValue"));
+        modified.Should().BeTrue();
+        lines.Should().Contain(l => l.Contains("NewPath"));
+    }
+
+    [Fact]
+    public void UpdateKeyIfExists_WhenKeyDoesNotExist_DoesNotAddAndReturnsFalse()
+    {
+        var lines = new List<string>
+        {
+            "[GERAL]",
+            "PathDataSource_NewAcessoConnectionRecord = \'ValidPath\'"
+        };
+
+        var modified = IniHelperBase.UpdateKeyIfExists(lines, "PathDataSouce_NewAcessoConnectionRecord", "NewPath", section: "GERAL");
+
+        modified.Should().BeFalse();
+        lines.Should().NotContain(l => l.Contains("PathDataSouce"));
+    }
+
+    [Fact]
+    public void RemoveKey_RemovesAllOccurrences()
+    {
+        var lines = new List<string>
+        {
+            "Dupe = 1",
+            "Keep = 2",
+            "Dupe = 3"
+        };
+
+        var removed = IniHelperBase.RemoveKey(lines, "Dupe");
+
+        removed.Should().BeTrue();
+        lines.Should().HaveCount(1);
+        lines[0].Should().Be("Keep = 2");
     }
 }

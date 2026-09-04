@@ -464,4 +464,40 @@ public class IisInstallerTests
         // Assert
         result.Should().BeFalse();
     }
+
+    // ============================================================
+    //  GrantDirectoryPermissionsAsync
+    // ============================================================
+
+    [Fact]
+    public async Task GrantDirectoryPermissionsAsync_WhenSucceeds_ReturnsTrue()
+    {
+        _executor.RunPowerShellCommandAsync(Arg.Any<string>(), Arg.Any<string>()).Returns(true);
+
+        var result = await _installer.GrantDirectoryPermissionsAsync(@"C:\NewAcesso\WebAppDS");
+
+        result.Should().BeTrue();
+        await _executor.Received(1).RunPowerShellCommandAsync(
+            Arg.Is<string>(s => s.Contains("icacls") && s.Contains("IIS_IUSRS")),
+            Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task GrantDirectoryPermissionsAsync_WhenFails_ReturnsFalse()
+    {
+        _executor.RunPowerShellCommandAsync(Arg.Any<string>(), Arg.Any<string>()).Returns(false);
+
+        var result = await _installer.GrantDirectoryPermissionsAsync(@"C:\NewAcesso\WebAppDS");
+
+        result.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GrantDirectoryPermissionsAsync_WhenPathEmpty_ThrowsArgumentException()
+    {
+        var act = async () => await _installer.GrantDirectoryPermissionsAsync("");
+
+        await act.Should().ThrowAsync<ArgumentException>();
+    }
 }
+

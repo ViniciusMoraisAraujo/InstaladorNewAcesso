@@ -1,8 +1,10 @@
 # 🏗️ Arquitetura — Instalador NewAcesso
 
-> **Versão:** 1.0  
-> **Última atualização:** Julho 2026  
-> **Propósito:** Documentar as decisões arquiteturais, estrutura, pontos fortes, fragilidades e sugestões de evolução do instalador unificado da plataforma NewAcesso.
+> **Versão:** 2.0  
+> **Framework:** .NET 10.0 / C# 13  
+> **Plataforma:** Windows Server 2016+ / Windows 10+ (x64)  
+> **Interface:** Terminal Interativo (Spectre.Console)  
+> **Propósito:** Documentar as decisões arquiteturais, estrutura de camadas, modelos de domínio, serviços de negócio, tratamento de erros e diretrizes de evolução do Instalador NewAcesso.
 
 ---
 
@@ -10,230 +12,121 @@
 
 1. [Visão Geral](#visão-geral)
 2. [Decisões Arquiteturais](#decisões-arquiteturais)
-3. [Estrutura do Projeto](#estrutura-do-projeto)
-4. [Camadas e Responsabilidades](#camadas-e-responsabilidades)
-5. [Modelos de Dados](#modelos-de-dados)
-6. [Navegação e Ciclo de Vida](#navegação-e-ciclo-de-vida)
-7. [Sistema de Temas](#sistema-de-temas)
-8. [Painel de Status e Erros](#painel-de-status-e-erros)
-9. [Estratégia de Testes](#estratégia-de-testes)
-10. [Pontos Fortes](#pontos-fortes)
-11. [Oportunidades de Melhoria](#oportunidades-de-melhoria)
-12. [Sugestões para o Futuro](#sugestões-para-o-futuro)
+3. [Estrutura da Solução e Camadas](#estrutura-da-solução-e-camadas)
+4. [Abstrações e Modelos de Domínio](#abstrações-e-modelos-de-domínio)
+5. [Serviços e Componentes do Core](#serviços-e-componentes-do-core)
+6. [Interface de Usuário (Console / Spectre.Console)](#interface-de-usuário-console--spectreconsole)
+7. [Tratamento de Erros, Logs e Auditoria](#tratamento-de-erros-logs-e-auditoria)
+8. [Estratégia de Testes](#estratégia-de-testes)
+9. [Pontos Fortes e Oportunidades de Evolução](#pontos-fortes-e-oportunidades-de-evolução)
 
 ---
 
-## Visão Geral
+## 📖 1. Visão Geral
 
-O **Instalador NewAcesso** é uma aplicação Windows responsável por automatizar a instalação completa da suíte de produtos NewAcesso em servidores — desde a configuração do IIS e ativação de Features do Windows até a instalação de MSIs, WebApps, criação de diretórios e agendamento de tarefas.
+O **Instalador NewAcesso** automatiza o ciclo completo de preparação de ambiente, ativação de recursos do sistema operacional, criação da árvore de diretórios, instalação de pacotes MSI, configuração de WebApps no IIS e agendamento de tarefas do sistema.
 
-A aplicação suporta **duas interfaces de usuário**:
+A aplicação é projetada sob o paradigma **Clean / Onion Architecture**, separando estritamente os contratos e modelos de domínio da lógica de negócio e da interface de apresentação no terminal.
 
-| Interface | Projeto | Tecnologia | Uso |
-|-----------|---------|-----------|-----|
-| **Gráfica (WinForms)** | `InstaladorNewAcesso.WinForms` | Windows Forms (.NET 10) | Operadores de TI |
-| **Terminal (Console)** | `InstaladorNewAcesso.Console` | Console + Spectre.Console | Automação / CI |
-
-Ambas compartilham a mesma camada de negócio (`Core`) e contratos (`Abstractions`), garantindo comportamento consistente independente da interface escolhida.
-
-### Público-alvo
-
-- Técnicos de TI que precisam instalar ou reinstalar servidores NewAcesso
-- Equipes de suporte que realizam diagnósticos remotos
-- Scripts de automação (modo console)
+### Público-Alvo e Casos de Uso
+- **Técnicos de Implantação e TI:** Instalação e reinstalação de servidores NewAcesso de forma guiada e sem intervenções manuais propensas a erro.
+- **Equipes de Suporte e Diagnóstico:** Verificação de integridade, reparo e desinstalação auditada de componentes.
+- **Pipelines de Automação / DevOps:** Execução modularizada e reprodutível.
 
 ---
 
-## Decisões Arquiteturais
+## 🏛️ 2. Decisões Arquiteturais
 
-### 1. Separação em Múltiplos Projetos (Solution .slnx)
-
-**Decisão:** Dividir a solução em 5 projetos + 1 de testes, cada um com responsabilidade bem definida.
-
-**Motivação:**
-- Isolamento de responsabilidades (Separation of Concerns)
-- Possibilidade de reuso do Core em outros contextos (ex: CLI headless)
-- Facilidade para testar cada camada independentemente
-- Prevenção de acoplamento entre UI e lógica de negócio
-
-**Trade-off:** A complexidade inicial de navegação entre projetos é maior que uma abordagem monolítica, mas o ganho em manutenibilidade a longo prazo compensa.
-
-### 2. Interface `IUIService` como Abstração de UI
-
-**Decisão:** Toda interação com o usuário passa pela interface `IUIService`, com implementações distintas para Console e WinForms.
-
-**Motivação:**
-- Permite que a lógica de negócio (`Core`) seja completamente agnóstica de UI
-- Facilita testes (pode-se mockar o IUIService)
-- Uma única base de código para dois frontends
-
-**Implementação:**
-- `ConsoleUIService` — usa Spectre.Console (markup, tabelas, painéis, spinners)
-- `WinFormsUIService` — usa RichTextBox + MessageDialogs, converte markup Spectre para texto limpo
-- Ambas são injetadas via construtor nos controles/views do Core
-- `UIScope.Current` é um `AsyncLocal` que permite acesso ao IUIService em contextos estáticos (usado em `MsiInstaller`, `WebAppInstaller`, `InstallerFactory`)
-
-```csharp
-public interface IUIService
-{
-    void WriteMessage(string text, string? color = null);
-    Task ShowProgress(string title, Func<Action<double, string>, Task> action);
-    string AskInput(string prompt, string? defaultValue = null);
-    // ... +30 métodos
-}
-```
-
-### 3. Arquitetura em Camadas (Onion/Clean Architecture)
-
-**Decisão:** Organizar o código em camadas concêntricas com dependências apontando para dentro.
+### 2.1. Separação Estrita em 3 Camadas + Testes (`.slnx`)
+A solução utiliza o formato XML moderno `.slnx` e mantém 4 projetos com responsabilidades ortogonais:
 
 ```
-┌─────────────────────────────────────┐
-│  WinForms / Console (UI)            │  → Conhece Abstractions + Core
-├─────────────────────────────────────┤
-│  Core (Lógica de Negócio)           │  → Conhece Abstractions
-├─────────────────────────────────────┤
-│  Abstractions (Contracts/Models)    │  → Conhece nada (projeto raiz)
-└─────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│  InstaladorNewAcesso.Console (UI / Ponto de Entrada)       │  → Conhece Abstractions + Core
+├────────────────────────────────────────────────────────────┤
+│  InstaladorNewAcesso.Core (Lógica de Negócio)              │  → Conhece exclusivamente Abstractions
+├────────────────────────────────────────────────────────────┤
+│  InstaladorNewAcesso.Abstractions (Contratos & Modelos)    │  → 0 dependências externas
+└────────────────────────────────────────────────────────────┘
 ```
 
-**Motivação:**
-- Desacoplamento total entre UI e regras de negócio
-- Testabilidade: Core e Abstractions têm 0 dependência de UI
-- Flexibilidade para substituir a camada de UI sem tocar em lógica
+- **Isolamento de Domínio:** `Abstractions` é uma biblioteca pura sem dependências de pacotes externos ou frameworks de UI.
+- **Core Agnóstico:** Toda comunicação visual na camada de negócio passa pela abstração [`IUIService`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Abstractions/Interfaces/IUIService.cs).
+- **Testabilidade:** Mocks e substitutos (NSubstitute) permitem testar toda a lógica de negócio sem abrir janelas ou depender de terminal real.
 
-### 4. NavigationManager com Ciclo de Vida `IView`
+### 2.2. Interface `IUIService` e Escopo Assíncrono (`UIScope`)
+- A interface `IUIService` abstrai escrita formatada (markup, cores, regras horizontais, tabelas, painéis), entradas com validação (`AskInput`, `AskPassword`, `Confirm`, `AskOption`), diálogos de progresso (`ShowProgress`) e status com spinners (`ShowStatus`).
+- O `ConsoleUIService` implementa `IUIService` delegando para o [Spectre.Console](https://spectreconsole.net/).
+- A classe [`UIScope.Current`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Core/Services/UIScope.cs) utiliza `AsyncLocal<IUIService?>` para permitir acesso seguro em fluxos assíncronos onde a injeção via construtor não esteja disponível.
 
-**Decisão:** Implementar navegação própria (sem frameworks) usando um `NavigationManager` que gerencia troca de `UserControl` em um `Panel` contentor, com suporte a histórico "voltar" e chamadas de ciclo de vida assíncronas.
-
-**Motivação:**
-- Evitar dependência externa de navegação (ex: WPF NavigationService)
-- Controle total sobre o ciclo de vida: `ActivateAsync()`/`DeactivateAsync()`
-- Histórico simples com `Stack<string>`
-
-**Ordem de execução no SwitchTo:**
-```
-1. DeactivateAsync() na tela antiga (ainda parenteada)
-2. Remove + Dispose da tela antiga
-3. Adiciona nova tela + Dock.Fill
-4. ActivateAsync() na nova tela (já parenteada)
-5. Notifica NavigationChanged + CanGoBackChanged
-```
-
-### 5. Sistema de Temas Centralizado
-
-**Decisão:** Toda cor, fonte e estilo visual reside em classes estáticas no namespace `Styles`.
-
-- `ThemeColors` — 30+ constantes de cor (Background, Surface, TextPrimary, Success, Danger, etc.)
-- `ThemeFonts` — 14 definições de fonte (TitleMain, ButtonAction, Body, Caption, Output, etc.) com cache lazy
-- `UIStyles` — 20+ métodos factory para criar controles já estilizados (CreateTitle, CreatePrimaryButton, CreateTextBox, etc.)
-
-**Motivação:**
-- Consistência visual em toda a aplicação
-- Tema escuro profissional sem repetição de código
-- Alteração de tema em um único lugar
-- Cache de fontes evita vazamento de recursos GDI
-
-### 6. Launcher como Ponto de Entrada
-
-**Decisão:** Um projeto separado (`InstaladorNewAcesso.Launcher`) pergunta ao usuário qual modo iniciar (WinForms ou Console), sem precisar de múltiplos executáveis na área de trabalho.
-
-**Motivação:**
-- Experiência unificada para o usuário final
-- Único atalho na área de trabalho
-- Launcher leve (não referencia Core nem WinForms diretamente)
-
-### 7. UIScope como Service Locator para IUIService
-
-**Decisão:** Usar `AsyncLocal<IUIService>` (`UIScope.Current`) para disponibilizar o serviço de UI em contextos estáticos dentro do Core.
-
-**Motivação:**
-- Classes no Core (como `MsiInstaller`, `WebAppInstaller`) precisam escrever no log da UI
-- Evita injeção por construtor em dezenas de classes de serviço
-- `AsyncLocal` garante isolamento por fluxo de execução assíncrono
+### 2.3. Idempotência e Execução Segura de Processos
+- Criação de diretórios, ativação de componentes do Windows e alteração de arquivos de configuração (.ini, .config, .xml) são idempotentes.
+- Invocações do Windows (PowerShell, DISM, msiexec) são encapsuladas por [`ProcessExecutor`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Core/Utils/ProcessExecutor.cs), garantindo captura segura de stdout/stderr, timeouts e logging.
 
 ---
 
-## Estrutura do Projeto
+## 📁 3. Estrutura da Solução e Camadas
 
 ```
 InstaladorNewAcesso/
+├── Directory.Build.props                         # Configurações globais de compilação e publicação
+├── InstaladorNewAcesso.slnx                      # Solution XML simplificado
+├── AGENTS.md                                     # Diretrizes para agentes de IA e desenvolvedores
+├── ARCHITECTURE.md                               # Este documento
+├── README.md                                     # Apresentação e guia rápido
+├── cleanup-orphans.ps1                           # Script de encerramento de processos órfãos
 │
-├── Directory.Build.props                    # Propriedades compartilhadas (TFM, nullable, warnings)
-├── InstaladorNewAcesso.slnx                 # Solution file (formato .slnx)
-├── ARCHITECTURE.md                          ← Este documento
+├── docs/                                         # Documentação técnica e operacional
+│   ├── setup-guide.md                            # Guia de compilação e publicação
+│   ├── features-and-msi-mapping.md               # Catálogo de recursos e mapeamento de MSIs
+│   └── troubleshooting.md                        # Diagnóstico e solução de problemas
+│
+├── scripts/
+│   ├── generate-icon.ps1                         # Geração de ícones da aplicação
+│   └── publish.ps1                               # Script de publicação self-contained
 │
 ├── src/
-│   ├── InstaladorNewAcesso.Abstractions/    # Interfaces + Models (0 dependências)
-│   ├── InstaladorNewAcesso.Core/            # Lógica de negócio (depende de Abstractions)
-│   ├── InstaladorNewAcesso.WinForms/        # UI WinForms (depende de Core + Abstractions)
-│   ├── InstaladorNewAcesso.Console/         # UI Console (depende de Core + Abstractions)
-│   └── InstaladorNewAcesso.Launcher/        # Ponto de entrada único
+│   ├── InstaladorNewAcesso.Abstractions/         # Interfaces e Modelos de Domínio
+│   ├── InstaladorNewAcesso.Core/                 # Lógica de negócio, instaladores e helpers
+│   └── InstaladorNewAcesso.Console/              # Interface de terminal (Spectre.Console)
 │
-├── tests/
-│   └── InstaladorNewAcesso.Tests/           # 513 testes (xUnit + FluentAssertions + NSubstitute)
-│
-└── dist/                                    # Build output (runtimeconfigs)
+└── tests/
+    └── InstaladorNewAcesso.Tests/                # 500+ testes unitários e de integração
 ```
-
-### Descrição dos Projetos
-
-| Projeto | Tipo | Depende de | Responsabilidade |
-|---------|------|-----------|-----------------|
-| `Abstractions` | Library | — | Interfaces (IView, IUIService, IProcessExecutor), Models (InstallationPaths, MsiInstallationModel, StepStatus, etc.) |
-| `Core` | Library | Abstractions | Serviços de instalação (MsiInstaller, WebAppInstaller, GoogleDriveDownloader), scanners, utilitários de configuração, helpers de IIS, factory de features do Windows |
-| `WinForms` | WinExe | Core, Abstractions | Forms, UserControls (11 controles), NavigationManager, Styles (ThemeColors, ThemeFonts), WinFormsUIService |
-| `Console` | Exe | Core, Abstractions | Program.cs com verificação de Admin, ConsoleUIService, Views (MainMenuView, MsiView, etc.) |
-| `Launcher` | WinExe | — (autônomo) | LauncherForm que pergunta "Modo Gráfico" ou "Terminal" e dispara o .exe correspondente |
-| `Tests` | Test | Abstractions, Core, WinForms | Testes unitários (xUnit) |
 
 ---
 
-## Camadas e Responsabilidades
+## 📐 4. Abstrações e Modelos de Domínio
 
-### Abstractions (Contratos)
+### Interfaces Principais (`InstaladorNewAcesso.Abstractions.Interfaces`)
+- [`IUIService`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Abstractions/Interfaces/IUIService.cs): Contrato de apresentação, entrada e saída.
+- [`IProcessExecutor`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Abstractions/Interfaces/IProcessExecutor.cs): Execução assíncrona de comandos PowerShell e captura de stdout.
+- [`IFeatureInstaller`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Abstractions/Interfaces/IFeatureInstaller.cs): Verificação e instalação de recursos do sistema operacional.
+- [`IIisInstaller`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Abstractions/Interfaces/IIisInstaller.cs): Gestão de AppPools e Sites no IIS.
+- [`IView`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Abstractions/Interfaces/IView.cs): Ciclo de vida de execução de views (`ExecuteAsync`).
 
-**Interfaces:**
-- `IView` — Ciclo de vida das telas (`Title`, `ActivateAsync()`, `DeactivateAsync()`)
-- `IViewModel` — Padrão MVVM simplificado (`IsBusy`, `StatusMessage`, `LoadAsync()`, `UnloadAsync()`)
-- `IUIService` — Abstração completa de UI (output, input, progresso, diálogos)
-- `INavigationService` — Navegação entre telas (`NavigateTo()`, `GoBack()`, `ReplaceWith()`)
-- `IFeatureInstaller` — Instalação de Features do Windows (`IsFeatureInstalledAsync()`, `InstallFeatureAsync()`)
-- `IIisInstaller` — Gerenciamento de IIS (AppPools, Sites, physicalPath)
-- `IProcessExecutor` — Execução de comandos PowerShell (`RunPowerShellCommandAsync()`, `RunPowerShellWithOutputAsync()`)
+### Modelos de Domínio (`InstaladorNewAcesso.Abstractions.Models`)
+- [`InstallationPaths`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Abstractions/Models/InstallationPaths.cs): Centraliza a estrutura de diretórios do NewAcesso com base em uma raiz configurável.
+- [`MsiInstallationModel`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Abstractions/Models/MsiInstallModel.cs): Encapsula o caminho de um MSI, diretório de destino e parâmetros de instalação.
+- [`WebAppModel`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Abstractions/Models/WebAppModel.cs): Metadados para configuração de aplicações Web no IIS (Porta, AppPool, Nome do Site).
+- [`WindowsFeature`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Abstractions/Models/WindowsFeature.cs): Mapeamento de nome amigável, identificador ServerManager e identificador DISM.
+- [`StepStatus`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Abstractions/Models/StepStatus.cs) & [`StepState`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Abstractions/Models/StepState.cs): Rastreamento de progresso de cada etapa (Pendente, Em Execução, Sucesso, Falha, Alerta).
 
-**Models:**
-- `InstallationPaths` — Estrutura de diretórios do NewAcesso
-- `MsiInstallationModel` — Dados para instalação de MSI
-- `WebAppModel` — Dados para instalação de WebApp (SiteName, AppPoolName, Port, etc.)
-- `WindowsFeature` — Record com FriendlyName, ServerName, DesktopName
-- `SummaryResult` — Resultado de uma etapa (Sucesso/Falha)
-- `StepState` — Enum: Pending, Running, Success, Failed, Warning
-- `StepStatus` — Model com Start/Complete/Fail/Warn, duração calculada
+---
 
-### Core (Lógica de Negócio)
+## ⚙️ 5. Serviços e Componentes do Core
 
-**Serviços:**
-| Classe | Função |
-|--------|--------|
-| `MsiInstaller` | Executa `msiexec /i`, aciona config helpers pós-instalação |
-| `MsiScanner` | Varre diretório de instaladores, mapeia MSIs → InstallationPaths |
-| `MsiUninstaller` | Desinstala MSI via `msiexec /x`, remove diretórios |
-| `WebAppInstaller` | Instala WebApp (MSI → IIS → config), com fallback Admin Install |
-| `WebAppScanner` | Identifica MSIs de WebApp (UI ou DS) no diretório de instaladores |
-| `GoogleDriveDownloader` | Baixa pasta inteira do Google Drive via API v3 (recursivo com paginação) |
+### 5.1. Instaladores e Scanners
+| Serviço | Responsabilidade |
+|---|---|
+| [`MsiScanner`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Core/Services/MsiScanner.cs) | Varre o diretório de instaladores e mapeia cada arquivo para sua pasta de destino correta no `InstallationPaths`. |
+| [`MsiInstaller`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Core/Services/MsiInstaller.cs) | Executa `msiexec.exe /i` de forma silenciosa com geração de log verbose e invoca os Config Helpers pós-instalação. |
+| [`MsiUninstaller`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Core/Services/MsiUninstaller.cs) | Desinstala os pacotes via `msiexec.exe /x`, remove diretórios remanescentes e audita todas as ações. |
+| [`WebAppScanner`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Core/Services/WebAppScanner.cs) | Localiza os MSIs de WebAppUI e WebAppDS. |
+| [`WebAppInstaller`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Core/Services/WebAppInstaller.cs) | Realiza a instalação de WebApps, configuração no IIS e fallback para Admin Install (`msiexec /a`). |
 
-**Utilitários:**
-| Classe | Função |
-|--------|--------|
-| `IisInstaller` | Cria/remove AppPools e Sites, atualiza physicalPath via PowerShell |
-| `ProcessExecutor` / `ProcessExecutorService` | Executa comandos PowerShell com output |
-| `SummaryStore` | Armazena resultados em memória com estatísticas |
-| `AuditLogger` | Log de auditoria em arquivo TXT |
-| `MsiLogHelper` | Análise de logs verbose do msiexec |
-| `ConfigBackupService` | Backup de arquivos de configuração (`.config`, `.ini`, `.xml`) antes de modificá-los, com timestamp no nome |
-
-**Config Helpers** (atualizam arquivos de configuração após instalação):
+### 5.2. Helpers de Configuração (Pós-Instalação)
+Após a extração de cada MSI, arquivos de configuração locais (.config, .ini, .xml) são ajustados por helpers especializados que herdam de `ConfigHelperBase` ou `IniHelperBase`:
 - `ConnectionRecordConfigHelper`
 - `ControleAcessoConfigHelper`
 - `ControleAcessoAgendamentoHelper`
@@ -242,421 +135,53 @@ InstaladorNewAcesso/
 - `StandAloneExConfigHelper`
 - `StandAloneImConfigHelper`
 - `WebAppConfigHelper`
-- `ConfigHelperBase` / `IniHelperBase` (classes base)
 
-**Configurações:**
-- `FeatureSetup` — Lista de 32 Windows Features com nomes para Server e Desktop
-- `DirectorySetup` — Gera todos os paths de diretório a partir do InstallationPaths
-
-**Implementações:**
-- `WindowsDesktopInstaller` — Instala features via DISM (`Enable-WindowsOptionalFeature`)
-- `WindowsServerInstaller` — Instala features via ServerManager (`Install-WindowsFeature`)
-- `InstallerFactory` — Detecta Windows Server vs Desktop e retorna implementação correta
-
-### WinForms (Interface Gráfica)
-
-**Forms:**
-- `MainForm` — Form principal com SplitContainer (conteúdo + log), painel lateral (StatusPanel + ErrorSummary), NavigationManager, barra de navegação
-
-**Controls** (11 UserControls):
-| Control | Função |
-|---------|--------|
-| `MainMenuControl` | Menu principal com botões de navegação |
-| `DownloadControl` | Download de instaladores do Google Drive |
-| `ResourcesControl` | Instalação de Features do Windows (DISM/ServerManager) |
-| `DirectoryControl` | Criação da estrutura de diretórios |
-| `IisControl` | Configuração de IIS (AppPools, Sites) |
-| `MsiControl` | Instalação de MSIs do sistema |
-| `WebAppControl` | Instalação de WebApps (UI + DS) |
-| `ScheduleControl` | Agendamento de tarefas |
-| `UninstallControl` | Desinstalação completa do sistema |
-| `StatusPanel` | Painel de progresso em tempo real (inline, não modal) |
-| `ErrorSummaryControl` | Lista filtrável de erros/avisos com detalhes expansíveis |
-
-**Componentes:**
-- `NavigationManager` — Gerencia pilha de navegação, ciclo de vida IView
-
-**Styles:**
-- `ThemeColors` — 30+ constantes de cor
-- `ThemeFonts` — 14 definições de fonte com cache
-- `UIStyles` — 20+ métodos factory para controles estilizados
-
-### Console (Interface Terminal)
-
-- `Program.cs` — Verificação de Admin, inicialização do ConsoleUIService, execução do MainMenuView
-- `ConsoleUIService` — Implementação do IUIService usando Spectre.Console
-
-As **Views** do Console residem no Core (`Core/Views/`), permitindo que ambos os frontends compartilhem a mesma lógica de apresentação.
+Antes de qualquer modificação, o [`ConfigBackupService`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Core/Utils/ConfigBackupService.cs) cria uma cópia de segurança com carimbo de data e hora.
 
 ---
 
-## Modelos de Dados
+## 🖥️ 6. Interface de Usuário (Console / Spectre.Console)
 
-### InstallationPaths
-
-Gera toda a estrutura de diretórios a partir de um `BasePath`:
-
-```
-📁 <BasePath>/
-├── 📁 Instaladores/
-└── 📁 NewAcesso/
-    ├── 📁 AutoAtendimento/
-    ├── 📁 ConexBridge/
-    ├── 📁 ConnectionRecord/
-    ├── 📁 Controller/
-    │   ├── 📁 ControleAcesso/
-    │   ├── 📁 CoreWs/
-    │   ├── 📁 Fabricantes/
-    │   └── 📁 Task/
-    ├── 📁 ControllerOffline/
-    │   ├── 📁 Arquivos/
-    │   ├── 📁 WinService_Ex/
-    │   └── 📁 WinService_In/
-    ├── 📁 VisitAuthorization/
-    ├── 📁 WebAppDS/
-    ├── 📁 WebAppUI/
-    │   └── 📁 Fabricantes/
-    └── 📁 Win/
-```
-
-### StepState (Enum)
-
-```
-Pending  (0) → Aguardando execução
-Running  (1) → Em execução
-Success  (2) → Concluída com sucesso
-Failed   (3) → Concluída com falha
-Warning  (4) → Concluída com aviso
-```
-
-### StepStatus
-
-Model com ciclo de vida controlado por métodos (`Start()`, `Complete()`, `Fail()`, `Warn()`) que gerenciam automáticamente `StartedAt`, `CompletedAt` e `Duration` (calculada).
+A interface de terminal é estruturada em **Views** orientadas a tarefas:
+- [`MainMenuView`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Console/Views/MainMenuView.cs): Menu mestre com 8 opções.
+- [`ResourceView`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Console/Views/ResourceView.cs): Ativação das 32 features Windows com barra de progresso.
+- [`DirectoryView`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Console/Views/DirectoryView.cs): Criação da estrutura de pastas.
+- [`IisView`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Console/Views/IisView.cs): Configuração dos AppPools e Sites do IIS.
+- [`MsiView`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Console/Views/MsiView.cs): Execução em lote dos instaladores MSI com feedback visual.
+- [`WebAppView`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Console/Views/WebAppView.cs): Instalação dos portais Web.
+- [`UninstallMenuView`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Console/Views/UninstallMenuView.cs): Desinstalação completa e limpeza.
+- [`SummaryPanelView`](file:///c:/dev/InstaladorNewAcesso-main/src/InstaladorNewAcesso.Console/Views/SummaryPanelView.cs): Painel consolidado com resumo e erros.
 
 ---
 
-## Navegação e Ciclo de Vida
+## 📋 7. Tratamento de Erros, Logs e Auditoria
 
-### Fluxo de Navegação
-
-```
-MainForm
-├── MainMenuControl
-│   ├── Download → DownloadControl
-│   │   └── (após download, volta ao MainMenu)
-│   ├── Resources → ResourcesControl
-│   ├── Directory → DirectoryControl
-│   ├── IIS → IisControl
-│   ├── MSI → MsiControl
-│   ├── WebApp → WebAppControl
-│   ├── Schedule → ScheduleControl
-│   └── Uninstall → UninstallControl
-│
-└── (Qualquer tela pode navegar para qualquer outra via NavigationManager)
-```
-
-### Ciclo de Vida IView
-
-Implementado via `NavigationManager.SwitchTo()`:
-
-```csharp
-// 1. DeactivateAsync na tela antiga (ainda no container)
-if (_currentControl is IView oldView)
-    _ = oldView.DeactivateAsync();
-
-// 2. Remove + Dispose
-_container.Controls.Remove(_currentControl);
-_currentControl.Dispose();
-
-// 3. Adiciona nova tela ao container (parenteia)
-_currentControl = newControl;
-_currentControl.Dock = DockStyle.Fill;
-_container.Controls.Add(_currentControl);
-
-// 4. ActivateAsync na nova tela (já parenteada)
-if (newControl is IView newView)
-    _ = newView.ActivateAsync();
-
-// 5. Notifica ouvintes
-NavigationChanged?.Invoke(name);
-CanGoBackChanged?.Invoke(CanGoBack);
-```
+1. **Auditoria Geral (`AuditLogger`):** Grava um arquivo de log textual registrando cada ação, início de etapa, comandos executados, sucessos e erros com data e hora UTC/Local.
+2. **Logs do Windows Installer (`MsiLogHelper`):** Captura a saída detalhada do `msiexec` e identifica padrões de erro comuns (como 1603 e 1618).
+3. **Resiliência:** Operações de I/O em disco e chamadas PowerShell utilizam validações prévias para evitar travamentos ou estados inconsistentes.
 
 ---
 
-## Sistema de Temas
+## 🧪 8. Estratégia de Testes
 
-### ThemeColors — Paleta Escura
-
-```
-Background     #12121E  (fundo principal)
-Surface        #1E1E32  (painéis, headers)
-SurfaceHover   #32324A  (hover)
-InputBg        #1E1E32  (inputs)
-
-TextPrimary    #FFFFFF
-TextSecondary  #808080
-TextAccent     #00FFFF  (ciano)
-TextMuted      #646478
-
-Primary        #0078D7  (azul ação)
-Success        #009632  (verde)
-Warning        #B45000  (laranja)
-Danger         #B42828  (vermelho)
-DangerDark     #B40000  (vermelho escuro)
-Neutral        #323246  (neutro)
-```
-
-### ThemeFonts — Cache Lazy
-
-Todas as fontes são criadas sob demanda e cacheadas em `Dictionary<string, Font>`. O cache é limpo via `ThemeFonts.ClearCache()` no `Dispose` do `MainForm`, prevenindo vazamento de recursos GDI.
-
-### UIStyles — Métodos Factory
-
-```csharp
-// Headers
-CreateTitle("text")         → Label 20pt Bold Cyan
-CreateSectionTitle("text")  → Label 16pt Bold Cyan
-CreateDescription("text")   → Label 11pt Gray
-
-// Buttons
-CreatePrimaryButton("text")   → Azul, 11pt Bold
-CreateSuccessButton("text")   → Verde, 11pt Bold
-CreateDangerButton("text")    → Vermelho, 11pt Bold
-CreateWarningButton("text")   → Laranja, 11pt Bold
-CreateSecondaryButton("text") → Neutro, 11pt Regular
-
-// Inputs
-CreateTextBox("default", 350) → Tema escuro, FixedSingle
-CreatePasswordBox(350)        → Com UseSystemPasswordChar
-CreateComboBox(["opt1",..])   → DropDownList, tema escuro
-
-// Layout
-CreateFlowPanel()       → FlowLayoutPanel horizontal transparente
-CreateTableLayout()     → TableLayoutPanel dock fill
-CreateActionPanel(btns) → Painel com botões de ação
-```
+- **Projetos:** `tests/InstaladorNewAcesso.Tests/`.
+- **Cobertura:**
+  - Testes unitários para todos os Config Helpers, Scanners, Models e Utilitários.
+  - Testes de integração em [`InstallationIntegrationTests.cs`](file:///c:/dev/InstaladorNewAcesso-main/tests/InstaladorNewAcesso.Tests/InstallationIntegrationTests.cs) validando a criação e limpeza real de estruturas de diretório em `Path.GetTempPath()`.
+- **Execução:**
+  ```powershell
+  dotnet test
+  ```
 
 ---
 
-## Painel de Status e Erros
+## 🚀 9. Pontos Fortes e Oportunidades de Evolução
 
-### StatusPanel
+### Pontos Fortes
+- **Total desacoplamento entre UI e Core:** Permite evolução, manutenção ou criação de novos frontends sem alterações na regra de negócio.
+- **Experiência rica de terminal:** Spectre.Console entrega visual moderno, barras de progresso e facilidade de operação.
+- **Alta cobertura de testes automatizados:** Mais de 500 testes assegurando estabilidade em refatorações.
 
-Exibido no lado direito do `MainForm`, substitui o antigo `ProgressDialog` modal:
-
-```
-┌─────────────────────────┐
-│ Progresso: 3/5 concluído│
-│ ████████░░░░ 60%        │
-│                         │
-│ Etapa         Duração   │
-│ ✓ MSI-01      12s       │
-│ ✓ MSI-02      8s        │
-│ ▶ MSI-03      5s        │  ← scroll automático
-│ ◻ MSI-04               │
-│ ◻ MSI-05               │
-│                         │
-│ Pronto / Falha: MSI-03  │
-└─────────────────────────┘
-```
-
-**Características:**
-- Timer único (não 1 por etapa) para atualizar durações
-- Scroll automático para etapa atual (`ScrollControlIntoView`)
-- Barra de progresso fica vermelha se houver falhas
-- Proteção contra double-count (não incrementa se etapa já concluída)
-- Timer é parado/disposed no Unload
-
-### ErrorSummaryControl
-
-Abaixo do StatusPanel, exibe erros e avisos:
-
-```
-┌─────────────────────────────┐
-│ ⚠️ Erros e Avisos           │
-│ 2 erros  1 aviso            │
-│ [Todos] [Erros] [Avisos]    │
-├─────────────────────────────┤
-│ ✗ [MSI] MSI-01 falhou      │
-│   Detalhe: Arquivo não...   │  ← clicável para expandir
-│ ⚠ [MSI] MSI-02 config      │
-│ ℹ [Sis] Instalação iniciada │
-├─────────────────────────────┤
-│ 📋 Copiar  🗑️ Limpar        │
-└─────────────────────────────┘
-```
-
-**Características:**
-- OwnerDraw com `TextRenderer` (texto nítido em high-DPI)
-- Botão "Copiar" exporta para clipboard
-- Botão "Limpar" reseta a lista
-- Filtros: Todos, Erros, Avisos
-- Contadores com cores (vermelho para erros, amarelo para avisos)
-
----
-
-## Estratégia de Testes
-
-O projeto possui **513 testes unitários** (xUnit + FluentAssertions + NSubstitute).
-
-### Cobertura
-
-| Área | Testes | O que cobre |
-|------|--------|-------------|
-| Models | ~30 | MsiInstallationModel, WebAppModel, InstallationPaths, WindowsFeature, StepState, StepStatus |
-| Services | ~120 | MsiInstaller, MsiScanner, MsiUninstaller, WebAppInstaller, WebAppScanner, GoogleDriveDownloader |
-| Configurations | ~40 | DirectorySetup, FeatureSetup |
-| Utils | ~250 | IisInstaller, ProcessExecutor, SummaryStore, AuditLogger, ConfigHelpers, MsiLogHelper, ViewHelper |
-| Implementations | ~30 | WindowsDesktopInstaller, WindowsServerInstaller |
-| Controls | ~34 | StatusPanel (20) + ErrorSummaryControl (14) apenas |
-| **Demais controles** | **0** | MsiControl, WebAppControl, IisControl, DirectoryControl, DownloadControl, etc. |
-| Integration | ~9 | Fluxos completos de instalação |
-| **Total** | **513** | **0 falhas, 0 pulados (~9s execução)** |
-
-### Padrões
-
-- `[Fact]` para testes simples
-- `[Theory]` + `[InlineData]` para testes parametrizados
-- `[Collection("IntegrationTests")]` para testes com estado estático (SummaryStore, AuditLogger)
-- FluentAssertions para asserções encadeadas
-- NSubstitute para mocks (IProcessExecutor)
-- Nomenclatura: `MethodName_Scenario_ExpectedResult` (ex: `AddError_ShouldIncrementErrorCount`)
-
-### Limitações
-
-- Testes de WinForms Controls criam instâncias reais (sem message pump), testando apenas API pública
-- Não há testes de UI automatizados (Selenium, WinAppDriver, etc.)
-- Cobertura de integração limitada (não executa msiexec nem PowerShell reais)
-
----
-
-## Pontos Fortes
-
-### ✅ Arquitetura Sólida
-
-1. **Separação clara de responsabilidades** — Abstractions → Core → UI, com dependências unidirecionais
-2. **Dual UI sem duplicação** — Console e WinForms compartilham 100% do Core
-3. **Tema centralizado** — Alterar a paleta inteira é editar um arquivo
-4. **Ciclo de vida IView** — `ActivateAsync()`/`DeactivateAsync()` garantem inicialização/limpeza consistente
-5. **Navegação com histórico** — Botão "voltar" funcional com pilha de navegação
-
-### ✅ Código Limpo
-
-1. **Zero hardcoded colors/fonts** — Tudo referenciado de ThemeColors/ThemeFonts
-2. **Factory methods** — UIStyles elimina repetição de criação de controles
-3. **513 testes** — Cobertura sólida com 0 falhas
-4. **Nullable habilitado** — Em toda a solution
-5. **Análise de código** — `latest-Recommended` + EnforceCodeStyleInBuild
-
-### ✅ Experiência do Usuário
-
-1. **Painel de status inline** — Substitui modais bloqueantes por feedback em tempo real
-2. **Sumário de erros filtrável** — Erros e avisos organizados, copiáveis para clipboard
-3. **Log textual completo** — RichTextBox com output de todas as operações
-4. **Duas interfaces** — Gráfica para operadores, terminal para automação
-5. **Launcher unificado** — Único atalho, escolha do modo na inicialização
-
----
-
-## Oportunidades de Melhoria
-
-### ⚠️ Dívida Técnica
-
-| Item | Impacto | Sugestão |
-|------|---------|----------|
-| **Chamadas diretas a `AnsiConsole` no Core** | Alto | `MsiInstaller`, `WebAppInstaller` e `WebAppScanner` usam `AnsiConsole.MarkupLine()` diretamente em vez de `UIScope.Current?.WriteMessage()`. Isso fere a abstração IUIService e amarra o Core ao Spectre.Console. | Migrar todo `AnsiConsole` no Core para `UIScope.Current.WriteMessage()` |
-
-| Item | Impacto | Sugestão |
-|------|---------|----------|
-| **UIScope (Service Locator)** | Médio | `UIScope.Current` é um anti-pattern Service Locator. Dificulta testes e esconde dependências. | Migrar para injeção por construtor nas classes do Core que usam IUIService |
-| **ViewModels não utilizados** | Baixo | `IViewModel` foi definido mas nenhum controle implementa. O padrão é MVVM pela metade. | Decidir: remover a interface ou implementá-la nos controles |
-| **Static mutable state** | Médio | `SummaryStore` e `AuditLogger` usam estado estático mutável. Podem causar interferência em testes paralelos. | Usar `[Collection]` (já feito) ou migrar para instâncias injetadas |
-| **Console Views no Core** | Médio | As Views do Console (`Core/Views/`) estão no projeto Core, não no Console. Mistura responsabilidades. | Mover para o projeto Console, ou criar um projeto SharedViews |
-| **`ScreenName` helper sem destaque** | Baixo | Classe `ScreenName` mapeia nomes de tela para display names (`"MainMenu" → "🚀 Menu Principal"`) mas não está documentada | Adicionar à seção de navegação |
-| **Tratamento de exceções genérico** | Baixo | Muitos `catch { return false; }` engolem exceções sem log | Loggar a exceção antes de retornar false |
-| **Fire-and-forget no NavigationManager** | Baixo | `_ = oldView.DeactivateAsync()` ignora exceções assíncronas | Tratar exceções no fire-and-forget com try-catch |
-
-### ⚠️ Cobertura de Testes
-
-| Área | Status | Ação |
-|------|--------|------|
-| **Views do Console** | ❌ Não testadas | Adicionar testes para MainMenuView, MsiView, etc. |
-| **Controles WinForms** | ✅ Testados | StatusPanel e ErrorSummaryControl cobertos |
-| **ConfigHelpers (arquivos reais)** | ✅ Testados | Com mocks de sistema de arquivos |
-| **Integração real (msiexec/PowerShell)** | ❌ Não testada | Testes de integração true exigem sandbox Windows |
-| **IisInstaller** | ✅ Testado | Com NSubstitute mockando IProcessExecutor |
-
-### ⚠️ Performance
-
-| Área | Observação |
-|------|------------|
-| **MsiScanner** | Varre diretórios recursivamente, pode ser lento em rede |
-| **GoogleDriveDownloader** | Download serial de arquivos (não paralelo) |
-| **ConfigHelpers** | Vários helpers executam I/O sequencial após cada MSI |
-| **WinFormsUIService** | Uso de `Invoke` para acesso ao RichTextBox — pode causar travamentos em operações muito rápidas |
-
----
-
-## Sugestões para o Futuro
-
-### 🎯 Curto Prazo (1-3 meses)
-
-1. **Remover `AnsiConsole` direto no Core** — Migrar `MsiInstaller`, `WebAppInstaller` e `WebAppScanner` para usar `UIScope.Current?.WriteMessage()` em vez de `AnsiConsole.MarkupLine()`, fortalecendo a abstração IUIService
-2. **Implementar IViewModel nos controles** — Isolar lógica de negócio dos UserControls, facilitando testes e manutenção
-3. **Migrar Console Views para projeto Console** — Remover acoplamento indevido entre Core e apresentação de terminal
-3. **Adicionar logging estruturado** — Substituir `AuditLogger` textual por algo como Serilog, com sinks para arquivo + console + (opcional) Seq
-4. **Paralelizar downloads do Google Drive** — Usar `Parallel.ForEachAsync` ou `SemaphoreSlim` para baixar múltiplos arquivos simultaneamente
-
-### 🎯 Médio Prazo (3-6 meses)
-
-5. **DI Container formal** — Introduzir Microsoft.Extensions.DependencyInjection para substituir `UIScope` e construtores manuais
-6. **Tema claro/escuro** — Adicionar toggle de tema (ThemeColors poderia vir de um `ThemeProvider`)
-7. **Relatório de instalação** — Gerar PDF/HTML com resumo da instalação (produtos instalados, erros, duração)
-8. **Progresso real** — Substituir barra de progresso baseada em contagem por feedback com `System.Threading.Channels` para operações paralelas
-
-### 🎯 Longo Prazo (6-12 meses)
-
-9. **Migração para MAUI/WPF** — Windows Forms é legado; WPF oferece melhor suporte a theming, data binding e high-DPI. MAUI permitiria (teoricamente) executar em terminal Windows
-10. **Modo headless completo** — `InstaladorNewAcesso.Headless` com `--silent`, `--config json`, `--log-format json` para integração com SCCM/Intune
-11. **Instalador web (Blazor)** — Interface web para instalação remota em múltiplos servidores simultaneamente
-12. **Self-update** — O próprio instalador verificar e baixar novas versões automaticamente
-
-### 💡 Ideias Pontuais
-
-- **Validação de pré-requisitos mais robusta** — Verificar versão do .NET, espaço em disco, versão do Windows, etc.
-- **Rollback automático** — Em caso de falha, desfazer todas as operações já realizadas (transação distribuída)
-- **Modo dark/light sync com o sistema** — Detectar tema do Windows e aplicar automaticamente
-- **Internacionalização (i18n)** — Suporte a múltiplos idiomas (atualmente todo em PT-BR)
-- **Gravação de sessão** — Log em formato estruturado (JSON) para debugging remoto
-- **Notificações** — Toast notifications ao finalizar instalação (mesmo com janela minimizada)
-
----
-
-## Glossário
-
-| Termo | Significado |
-|-------|-------------|
-| **MSI** | Windows Installer Package (.msi) |
-| **IIS** | Internet Information Services |
-| **AppPool** | Application Pool (IIS) — isolamento de aplicações web |
-| **DISM** | Deployment Image Servicing and Management (Desktop) |
-| **ServerManager** | PowerShell module para gerenciar Windows Server features |
-| **WebAppUI** | Interface web do NewAcesso |
-| **WebAppDS** | WebService de dados do NewAcesso |
-| **SxS** | Side-by-side — fonte de instalação para Features do Windows |
-| **Admin Install** | `msiexec /a` — extrai MSI sem instalar (modo administrativo) |
-| **Robocopy** | Robust File Copy — utilitário Windows para cópia de arquivos |
-
----
-
-### 🗑️ Componentes Legados (Ainda Presentes)
-
-| Componente | Localização | Substituído por | Status |
-|-----------|-------------|----------------|--------|
-| `ProgressDialog` | `WinForms/Dialogs/ProgressDialog.cs` | `StatusPanel` (inline) | 🟡 Ainda usado pelo `WinFormsUIService.ShowProgress()`/`ShowStatus()`; convive lado a lado com o StatusPanel |
-| `MainMenuView` (Console) | `Core/Views/MainMenuView.cs` | — | 🟢 Em uso ativo no modo Console |
-
----
-
-> Este documento reflete o estado atual do código e deve ser atualizado conforme a arquitetura evolui.
+### Oportunidades de Evolução Futura
+1. **Passagem explícita de `CancellationToken`:** Evoluir todas as assinaturas assíncronas do Core para aceitar `CancellationToken` opcional, facilitando cancelamentos graciosos via Ctrl+C.
+2. **Injeção de Dependência Formal:** Adotar `Microsoft.Extensions.DependencyInjection` para registro e resolução formal de serviços caso a complexidade aumente.

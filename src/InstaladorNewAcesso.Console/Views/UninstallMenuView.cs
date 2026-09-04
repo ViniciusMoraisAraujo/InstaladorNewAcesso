@@ -1,4 +1,4 @@
-﻿using InstaladorNewAcesso.Abstractions.Interfaces;
+using InstaladorNewAcesso.Abstractions.Interfaces;
 using InstaladorNewAcesso.Abstractions.Models;
 using InstaladorNewAcesso.Core.Configurations;
 using InstaladorNewAcesso.Core.Factories;
@@ -33,7 +33,7 @@ public class UninstallMenuView
             return;
         }
 
-        AuditLogger.Start(_paths!.BasePath);
+        AuditLogger.Start(_paths!.BasePath, AuditType.Uninstall);
         var auditPath = AuditLogger.CurrentLogPath;
         _ui.WriteMessage($" [gray]Log de auditoria: {auditPath?.EscapeMarkup() ?? "?"}[/]");
 

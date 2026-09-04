@@ -1,4 +1,4 @@
-﻿using InstaladorNewAcesso.Abstractions.Interfaces;
+using InstaladorNewAcesso.Abstractions.Interfaces;
 
 namespace InstaladorNewAcesso.Core.Utils;
 
@@ -176,6 +176,13 @@ public class IisInstaller : IIisInstaller
         }
 
         return result;
+    }
+
+    public async Task<bool> GrantDirectoryPermissionsAsync(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        var cmd = $"-Command \"icacls '{path}' /grant 'IIS_IUSRS:(OI)(CI)M' 'IUSR:(OI)(CI)RX' /t /c /q\"";
+        return await _executor.RunPowerShellCommandAsync(cmd, $"Permissões NTFS: {path}");
     }
 
     public async Task<bool> RemoveSiteAsync(string name)

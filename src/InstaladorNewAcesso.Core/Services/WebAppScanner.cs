@@ -25,32 +25,30 @@ public class WebAppScanner
 
         if (!Directory.Exists(_msiSourceRoot))
         {
-            UIScope.WriteMessage($"[gray][[DEBUG]] Diret�rio n�o encontrado: {MarkupHelper.Escape(_msiSourceRoot)}[/]");
+            UIScope.WriteMessage($"[gray][[DEBUG]] Diretrio no encontrado: {MarkupHelper.Escape(_msiSourceRoot)}[/]");
             return webApps;
         }
 
         UIScope.WriteMessage($"[gray][[DEBUG]] Escaneando: {MarkupHelper.Escape(_msiSourceRoot)}[/]");
 
-        // Escaneia subpastas de primeiro n�vel
+        // Escaneia subpastas de primeiro nível
         foreach (var subDir in Directory.GetDirectories(_msiSourceRoot))
         {
             var folderName = Path.GetFileName(subDir);
             UIScope.WriteMessage($"[gray][[DEBUG]] Verificando pasta: {MarkupHelper.Escape(folderName)}[/]");
 
-            var isDbFolder =
-                folderName.Equals("SQLServer", StringComparison.OrdinalIgnoreCase) ||
-                folderName.Equals("Oracle", StringComparison.OrdinalIgnoreCase);
+            var isDbFolder = IsDatabaseFolder(folderName);
 
             if (isDbFolder)
             {
-                if (folderName.Equals(_dbChoice, StringComparison.OrdinalIgnoreCase))
+                if (MatchesDatabaseChoice(folderName, _dbChoice))
                 {
                     UIScope.WriteMessage($"[gray][[DEBUG]] Pasta do banco '{MarkupHelper.Escape(folderName)}' corresponde. Escaneando...[/]");
                     AddRange(webApps, ScanDirectory(subDir, SearchOption.AllDirectories), addedMsiPaths);
                 }
                 else
                 {
-                    UIScope.WriteMessage($"[gray][[DEBUG]] Pasta do banco '{MarkupHelper.Escape(folderName)}' ignorada (n�o � '{MarkupHelper.Escape(_dbChoice)}')[/]");
+                    UIScope.WriteMessage($"[gray][[DEBUG]] Pasta do banco '{MarkupHelper.Escape(folderName)}' ignorada (não é '{MarkupHelper.Escape(_dbChoice)}')[/]");
                 }
                 continue;
             }
@@ -79,6 +77,28 @@ public class WebAppScanner
         }
     }
 
+    public static bool IsDatabaseFolder(string folderName) =>
+        folderName.Contains("SQLServer", StringComparison.OrdinalIgnoreCase) ||
+        folderName.Contains("SQL Server", StringComparison.OrdinalIgnoreCase) ||
+        folderName.Contains("Oracle", StringComparison.OrdinalIgnoreCase);
+
+    public static bool MatchesDatabaseChoice(string folderName, string dbChoice)
+    {
+        if (dbChoice.Equals("SQLServer", StringComparison.OrdinalIgnoreCase))
+        {
+            return (folderName.Contains("SQLServer", StringComparison.OrdinalIgnoreCase) ||
+                    folderName.Contains("SQL Server", StringComparison.OrdinalIgnoreCase)) &&
+                   !folderName.Contains("Oracle", StringComparison.OrdinalIgnoreCase);
+        }
+        if (dbChoice.Equals("Oracle", StringComparison.OrdinalIgnoreCase))
+        {
+            return folderName.Contains("Oracle", StringComparison.OrdinalIgnoreCase) &&
+                   !folderName.Contains("SQLServer", StringComparison.OrdinalIgnoreCase) &&
+                   !folderName.Contains("SQL Server", StringComparison.OrdinalIgnoreCase);
+        }
+        return false;
+    }
+
     private List<WebAppModel> ScanDirectory(string directory, SearchOption searchOption)
     {
         var webApps = new List<WebAppModel>();
@@ -93,7 +113,8 @@ public class WebAppScanner
 
             // Identificar WebAppDS (verificado antes de UI para evitar falso positivo
             // caso um nome contenha ambas as siglas)
-            if (fileName.Contains("DS", StringComparison.OrdinalIgnoreCase))
+            if (fileName.Contains("DS", StringComparison.OrdinalIgnoreCase) ||
+                fileName.Contains("WebDataService", StringComparison.OrdinalIgnoreCase))
             {
                 UIScope.WriteMessage($"[gray][[DEBUG]] -> Detectado como WebAppDS![/]");
                 webApps.Add(new WebAppModel
@@ -107,7 +128,9 @@ public class WebAppScanner
                 });
             }
             // Identificar WebAppUI
-            else if (fileName.Contains("UI", StringComparison.OrdinalIgnoreCase))
+            else if (fileName.Contains("UI", StringComparison.OrdinalIgnoreCase) ||
+                     fileName.Contains("WebAppUI", StringComparison.OrdinalIgnoreCase) ||
+                     fileName.Contains("WebUI", StringComparison.OrdinalIgnoreCase))
             {
                 UIScope.WriteMessage($"[gray][[DEBUG]] -> Detectado como WebAppUI![/]");
                 webApps.Add(new WebAppModel
@@ -122,7 +145,7 @@ public class WebAppScanner
             }
             else
             {
-                UIScope.WriteMessage($"[gray][[DEBUG]] -> N�o reconhecido como WebAppUI nem WebAppDS. Ignorado.[/]");
+                UIScope.WriteMessage($"[gray][[DEBUG]] -> Não reconhecido como WebAppUI nem WebAppDS. Ignorado.[/]");
             }
         }
 

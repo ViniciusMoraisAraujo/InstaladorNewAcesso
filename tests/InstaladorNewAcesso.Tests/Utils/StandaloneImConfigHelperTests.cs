@@ -4,11 +4,6 @@ using InstaladorNewAcesso.Core.Utils;
 
 namespace InstaladorNewAcesso.Tests.Utils;
 
-/// <summary>
-/// Testes para StandAloneImConfigHelper. Como o método UpdateConfigAfterInstall
-/// chama AnsiConsole.Ask (input do usuário), testamos apenas os caminhos
-/// que retornam antes de chegar ao prompt.
-/// </summary>
 public class StandAloneImConfigHelperTests : IDisposable
 {
     private readonly string _tempRoot;
@@ -64,6 +59,45 @@ public class StandAloneImConfigHelperTests : IDisposable
         var result = StandAloneImConfigHelper.UpdateConfigAfterInstall(dir);
 
         result.Should().BeFalse();
+    }
+
+    [Fact]
+    public void UpdateConfig_WithAlternateNameIn_UpdatesSuccessfully()
+    {
+        var dir = Path.Combine(_tempRoot, "NewAcesso", "ControllerOffline", "WinService_In");
+        Directory.CreateDirectory(dir);
+        var configPath = Path.Combine(dir, "PrimeAcesso.Controller.StandAloneIn.exe.config");
+        CreateMinimalConfig(configPath);
+
+        var result = StandAloneImConfigHelper.UpdateConfig(dir, idConexao: "3");
+
+        result.Should().BeTrue();
+
+        var doc = new XmlDocument();
+        doc.Load(configPath);
+        var idNode = doc.SelectSingleNode("//add[@key=\'ID_Conexao_NewAcessoConnectionRecord\']") as XmlElement;
+        idNode.Should().NotBeNull();
+        idNode!.GetAttribute("value").Should().Be("3");
+    }
+
+    [Fact]
+    public void UpdateConfig_WithTrailingSlash_ResolvesDbPathCorrectly()
+    {
+        var dir = Path.Combine(_tempRoot, "NewAcesso", "ControllerOffline", "WinService_In");
+        Directory.CreateDirectory(dir);
+        var configPath = Path.Combine(dir, "PrimeAcesso.Controller.StandAloneIn.exe.config");
+        CreateMinimalConfig(configPath);
+
+        var result = StandAloneImConfigHelper.UpdateConfig(dir + @"\");
+
+        result.Should().BeTrue();
+
+        var doc = new XmlDocument();
+        doc.Load(configPath);
+        var dbNode = doc.SelectSingleNode("//add[@key=\'PathDataSource_NewAcessoConnectionRecord\']") as XmlElement;
+        dbNode.Should().NotBeNull();
+        var expectedDb = Path.Combine(_tempRoot, "NewAcesso", "ConnectionRecord", "DataBase", "NewAcessoConnection.s3db");
+        dbNode!.GetAttribute("value").Should().Be(expectedDb);
     }
 
     public void Dispose()

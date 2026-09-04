@@ -1,4 +1,4 @@
-﻿using System.Xml;
+using System.Xml;
 using FluentAssertions;
 using InstaladorNewAcesso.Core.Configurations;
 using InstaladorNewAcesso.Abstractions.Models;
@@ -32,7 +32,6 @@ public class InstallationIntegrationTests : IDisposable
     public void DirectoryCreation_FullFlow_CreatesAllExpectedPaths()
     {
         // Arrange
-        var setup = new DirectorySetup();
         var allPaths = DirectorySetup.GetAllPaths(_paths).ToList();
 
         // Act — criar todos os diretórios
@@ -53,15 +52,14 @@ public class InstallationIntegrationTests : IDisposable
         Directory.Exists(_paths.ControllerOfflineWinServiceIn).Should().BeTrue();
         Directory.Exists(_paths.WebAppUIFabricantes).Should().BeTrue();
 
-        // Contagem total de diretórios
-        allPaths.Should().HaveCount(17); // 9 base + 8 nested
+        // Contagem total de diretórios (1 InstallationPath + 9 base + 8 nested = 18)
+        allPaths.Should().HaveCount(18);
     }
 
     [Fact]
     public void DirectoryCreation_Idempotent_RunningTwiceDoesNotThrow()
     {
         // Arrange
-        var setup = new DirectorySetup();
         var allPaths = DirectorySetup.GetAllPaths(_paths).ToList();
 
         // Act — criar duas vezes
@@ -82,7 +80,6 @@ public class InstallationIntegrationTests : IDisposable
     public void DirectoryCreation_WithFilesInside_CanBeDeleted()
     {
         // Arrange — cria estrutura com arquivos dentro
-        var setup = new DirectorySetup();
         foreach (var dir in DirectorySetup.GetAllPaths(_paths))
         {
             Directory.CreateDirectory(dir);
@@ -260,7 +257,7 @@ public class InstallationIntegrationTests : IDisposable
         var basePath = Path.Combine(_tempRoot, "LogTest");
         Directory.CreateDirectory(basePath);
 
-        AuditLogger.Start(basePath);
+        AuditLogger.Start(basePath, AuditType.Uninstall);
 
         // Act — log de várias operações
         AuditLogger.Log("Remover Site IIS", "WebAppDS", true);
@@ -276,6 +273,7 @@ public class InstallationIntegrationTests : IDisposable
         SummaryStore.Add("Desinstalação", $"Diretório {_paths.Controller}", false, "Diretório não encontrado");
 
         AuditLogger.Separator("FIM DA DESINSTALAÇÃO");
+        var logPath = AuditLogger.CurrentLogPath;
         AuditLogger.Finish();
 
         // Assert — SummaryStore
@@ -285,7 +283,6 @@ public class InstallationIntegrationTests : IDisposable
         falhas.Should().Be(1);
 
         // Assert — AuditLogger: arquivo de log foi criado
-        var logPath = AuditLogger.CurrentLogPath;
         logPath.Should().NotBeNull();
         File.Exists(logPath!).Should().BeTrue();
 
@@ -396,7 +393,6 @@ public class InstallationIntegrationTests : IDisposable
         File.WriteAllText(Path.Combine(msiRoot, "Controller", "Controller.msi"), "dummy");
 
         // DirectorySetup cria estes diretórios:
-        var setup = new DirectorySetup();
         foreach (var dir in DirectorySetup.GetAllPaths(_paths))
             Directory.CreateDirectory(dir);
 
@@ -418,7 +414,6 @@ public class InstallationIntegrationTests : IDisposable
     public void UninstallDirectoryFlow_RemovesAllDirectoriesInReverseOrder()
     {
         // Arrange — cria estrutura completa
-        var setup = new DirectorySetup();
         var allPaths = DirectorySetup.GetAllPaths(_paths).ToList();
         foreach (var dir in allPaths)
         {
@@ -457,7 +452,6 @@ public class InstallationIntegrationTests : IDisposable
         File.WriteAllText(Path.Combine(msiRoot, "WebAppUI.msi"), "dummy");
 
         // DirectorySetup cria os diretórios de destino
-        var dirSetup = new DirectorySetup();
         foreach (var dir in DirectorySetup.GetAllPaths(_paths))
             Directory.CreateDirectory(dir);
 

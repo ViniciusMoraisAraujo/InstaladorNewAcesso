@@ -1,67 +1,82 @@
-using System.Xml;
+﻿using System.Xml;
 using InstaladorNewAcesso.Core.Services;
 
 namespace InstaladorNewAcesso.Core.Utils;
 
 public static class TaskConfigHelper
 {
-    private const string ConfigFileName = "PrimeAcesso.Task.exe.config";
+    private static readonly string[] PossibleConfigFileNames =
+    [
+        "PrimeAcesso.Controller.Task.exe.config",
+        "PrimeAcesso.Task.exe.config"
+    ];
 
-    /// <summary>
-    /// Apos instalar o Task, verifica se o diretorio de destino
-    /// contem o arquivo PrimeAcesso.Task.exe.config e, se sim,
-    /// solicita os valores do usuario e atualiza todas as chaves.
-    /// </summary>
     public static bool UpdateConfigAfterInstall(string targetDirectory)
     {
-        var configPath = Path.Combine(targetDirectory, ConfigFileName);
+        var taskDir = ConfigHelperBase.NormalizeDirectoryPath(targetDirectory);
+        var controllerDir = Path.GetDirectoryName(taskDir);
+        var newAcessoRoot = controllerDir != null ? Path.GetDirectoryName(controllerDir) : null;
 
-        if (!File.Exists(configPath))
+        if (string.IsNullOrEmpty(controllerDir) || string.IsNullOrEmpty(newAcessoRoot) ||
+            (!controllerDir.EndsWith("Controller", StringComparison.OrdinalIgnoreCase) && !controllerDir.EndsWith("Controlador", StringComparison.OrdinalIgnoreCase)))
         {
-            UIScope.WriteMessage($"[gray]   [[INFO]] Task .config nao encontrado: {MarkupHelper.Escape(configPath)}[/]");
+            UIScope.WriteMessage($"[yellow]   [[AVISO]] Nao foi possivel determinar estrutura de diretorios a partir de: {MarkupHelper.Escape(taskDir)}[/]");
+            return false;
+        }
+
+        return UpdateConfig(targetDirectory);
+    }
+
+    public static bool UpdateConfig(string targetDirectory, string? idConexao = null, string? dbPath = null, string? fabricante = null, string? horaExclusao = null)
+    {
+        var taskDir = ConfigHelperBase.NormalizeDirectoryPath(targetDirectory);
+        string? configPath = null;
+        foreach (var name in PossibleConfigFileNames)
+        {
+            var p = Path.Combine(taskDir, name);
+            if (File.Exists(p))
+            {
+                configPath = p;
+                break;
+            }
+        }
+
+        if (configPath == null)
+        {
+            UIScope.WriteMessage($"[gray]   [[INFO]] Task .config nao encontrado em: {MarkupHelper.Escape(targetDirectory)}[/]");
             return false;
         }
 
         try
         {
-            // Calcula o path absoluto para ConnectionRecord\DataBase\NewAcessoConnection.s3db
-            // targetDirectory = {BasePath}\NewAcesso\Controller\Task
-            var taskDir = targetDirectory;
-            var controllerDir = Path.GetDirectoryName(taskDir);    // {BasePath}\NewAcesso\Controller
-            var newAcessoRoot = Path.GetDirectoryName(controllerDir); // {BasePath}\NewAcesso
+            var controllerDir = Path.GetDirectoryName(taskDir);
+            var newAcessoRoot = controllerDir != null ? Path.GetDirectoryName(controllerDir) : null;
 
-            if (string.IsNullOrEmpty(controllerDir) || string.IsNullOrEmpty(newAcessoRoot))
+            var resolvedDbPath = dbPath;
+            if (string.IsNullOrEmpty(resolvedDbPath) && !string.IsNullOrEmpty(newAcessoRoot))
             {
-                UIScope.WriteMessage($"[yellow]   [[AVISO]] Nao foi possivel determinar estrutura de diretorios a partir de: {MarkupHelper.Escape(taskDir)}[/]");
-                return false;
+                resolvedDbPath = Path.Combine(newAcessoRoot, "ConnectionRecord", "DataBase", "NewAcessoConnection.s3db");
             }
 
-            var connectionRecordDbPath = Path.Combine(newAcessoRoot, "ConnectionRecord", "DataBase", "NewAcessoConnection.s3db");
+            if (string.IsNullOrEmpty(resolvedDbPath))
+            {
+                resolvedDbPath = @"C:\SoftPrime\NewAcesso\ConnectionRecord\DataBase\NewAcessoConnection.s3db";
+            }
 
-            // Carrega o XML
+            var resolvedId = idConexao ?? "1";
+
+            ConfigBackupService.BackupSingleFile(configPath);
+
             var doc = new XmlDocument();
             doc.Load(configPath);
             var appSettings = ConfigHelperBase.EnsureAppSettings(doc);
 
-            // Chaves fixas (sem prompt)
             ConfigHelperBase.SetKey(appSettings, "Endereco_ServidorBiometrico", "localhost");
-            ConfigHelperBase.SetKey(appSettings, "PathDataSource_NewAcessoConnectionRecord", connectionRecordDbPath);
+            ConfigHelperBase.SetKey(appSettings, "PathDataSource_NewAcessoConnectionRecord", resolvedDbPath);
+            ConfigHelperBase.SetKey(appSettings, "ID_Conexao_NewAcessoConnectionRecord", resolvedId);
             ConfigHelperBase.SetKey(appSettings, "ExecutarExclusaoFacial", "True");
-
-            // Chaves que exigem input do usuario
-            UIScope.WriteMessage("\n   [bold yellow]Configuracao do Task:[/]");
-
-            var idConexao = UIScope.AskInput("   [bold yellow]ID_Conexao_NewAcessoConnectionRecord[/] (padrao: [gray]1[/]):", "1");
-            ConfigHelperBase.SetKey(appSettings, "ID_Conexao_NewAcessoConnectionRecord", idConexao);
-
-            var fabricante = UIScope.AskInput("   [bold yellow]FabricanteEquipamentoFacial[/] (ex: [gray]Evo|Avicam|ControlId[/]):", "Evo");
-            ConfigHelperBase.SetKey(appSettings, "FabricanteEquipamentoFacial", fabricante);
-
-            var horaExclusao = UIScope.AskInput("   [bold yellow]HoraExecucaoExclusaoFacial[/] (padrao: [gray]17:00[/]):", "17:00");
-            ConfigHelperBase.SetKey(appSettings, "HoraExecucaoExclusaoFacial", horaExclusao);
-
-            var logDetalhado = UIScope.Confirm("   [bold yellow]LogDetalhado[/] (deseja log detalhado?)", false);
-            ConfigHelperBase.SetKey(appSettings, "LogDetalhado", logDetalhado ? "True" : "False");
+            ConfigHelperBase.SetKey(appSettings, "FabricanteEquipamentoFacial", fabricante ?? "TopData");
+            ConfigHelperBase.SetKey(appSettings, "HoraExecucaoExclusaoFacial", horaExclusao ?? "17:00");
 
             doc.Save(configPath);
             UIScope.WriteMessage("   [green][[OK]] Task .config configurado com sucesso.[/]");

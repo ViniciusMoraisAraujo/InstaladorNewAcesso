@@ -60,6 +60,16 @@ public class WebAppInstallerTests : IDisposable
     }
 
     [Fact]
+    public void HasDeployableFiles_WithSvcFiles_ShouldReturnTrue()
+    {
+        Directory.CreateDirectory(_tempRoot);
+        File.Create(Path.Combine(_tempRoot, "service.svc")).Dispose();
+
+        var result = WebAppInstaller.HasDeployableFiles(_tempRoot);
+        result.Should().BeTrue();
+    }
+
+    [Fact]
     public void HasDeployableFiles_WithNonDeployableFiles_ShouldReturnFalse()
     {
         Directory.CreateDirectory(_tempRoot);
@@ -108,7 +118,6 @@ public class WebAppInstallerTests : IDisposable
     public void LocateInstalledPath_WhenNoDeployableFiles_ShouldReturnNull()
     {
         Directory.CreateDirectory(_tempRoot);
-        // Criar subpasta vazia também
         Directory.CreateDirectory(Path.Combine(_tempRoot, "WebAppDS"));
 
         var result = WebAppInstaller.LocateInstalledPath(_tempRoot, "WebAppDS");
@@ -118,7 +127,6 @@ public class WebAppInstallerTests : IDisposable
     [Fact]
     public void LocateInstalledPath_ForcedPathTakesPriorityOverSubfolder()
     {
-        // Ambos têm arquivos deployable - deve retornar ForcedPath (prioridade)
         Directory.CreateDirectory(_tempRoot);
         File.Create(Path.Combine(_tempRoot, "app.dll")).Dispose();
 
@@ -135,7 +143,6 @@ public class WebAppInstallerTests : IDisposable
     {
         var subfolder = Path.Combine(_tempRoot, "WebAppUI");
         Directory.CreateDirectory(subfolder);
-        // Apenas arquivos .txt em subpasta aninhada
         var nested = Path.Combine(subfolder, "bin");
         Directory.CreateDirectory(nested);
         File.Create(Path.Combine(nested, "lib.dll")).Dispose();
@@ -146,6 +153,98 @@ public class WebAppInstallerTests : IDisposable
     }
 
     // ============================================================
+    //  IsWebRoot
+    // ============================================================
+
+    [Fact]
+    public void IsWebRoot_WhenDirectoryDoesNotExist_ReturnsFalse()
+    {
+        var nonExistent = Path.Combine(_tempRoot, "missing");
+        WebAppInstaller.IsWebRoot(nonExistent).Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsWebRoot_WithWebConfigFile_ReturnsTrue()
+    {
+        Directory.CreateDirectory(_tempRoot);
+        File.WriteAllText(Path.Combine(_tempRoot, "web.config"), "<configuration/>");
+
+        WebAppInstaller.IsWebRoot(_tempRoot).Should().BeTrue();
+    }
+
+    [Fact]
+    public void IsWebRoot_WithBinDllFiles_ReturnsTrue()
+    {
+        var binDir = Path.Combine(_tempRoot, "bin");
+        Directory.CreateDirectory(binDir);
+        File.Create(Path.Combine(binDir, "app.dll")).Dispose();
+
+        WebAppInstaller.IsWebRoot(_tempRoot).Should().BeTrue();
+    }
+
+    [Fact]
+    public void IsWebRoot_WithEmptyDirectory_ReturnsFalse()
+    {
+        Directory.CreateDirectory(_tempRoot);
+        WebAppInstaller.IsWebRoot(_tempRoot).Should().BeFalse();
+    }
+
+    // ============================================================
+    //  LocateWebRoot
+    // ============================================================
+
+    [Fact]
+    public void LocateWebRoot_WhenDirectoryDoesNotExist_ReturnsNull()
+    {
+        var nonExistent = Path.Combine(_tempRoot, "missing");
+        WebAppInstaller.LocateWebRoot(nonExistent).Should().BeNull();
+    }
+
+    [Fact]
+    public void LocateWebRoot_WhenWebConfigAtRoot_ReturnsStagingRoot()
+    {
+        Directory.CreateDirectory(_tempRoot);
+        File.WriteAllText(Path.Combine(_tempRoot, "web.config"), "<configuration/>");
+
+        var result = WebAppInstaller.LocateWebRoot(_tempRoot);
+        result.Should().Be(_tempRoot);
+    }
+
+    [Fact]
+    public void LocateWebRoot_WhenNestedWebConfigInAdminInstallTree_ReturnsNestedFolder()
+    {
+        var nestedDir = Path.Combine(_tempRoot, "SourceDir", "inetpub", "wwwroot", "WebAppDS");
+        Directory.CreateDirectory(nestedDir);
+        File.WriteAllText(Path.Combine(nestedDir, "web.config"), "<configuration/>");
+        var bin = Path.Combine(nestedDir, "bin");
+        Directory.CreateDirectory(bin);
+        File.Create(Path.Combine(bin, "WebAppDS.dll")).Dispose();
+
+        var result = WebAppInstaller.LocateWebRoot(_tempRoot);
+        result.Should().Be(nestedDir);
+    }
+
+    [Fact]
+    public void LocateWebRoot_WhenOnlyBinDllsExist_ReturnsParentDirectory()
+    {
+        var subDir = Path.Combine(_tempRoot, "WebAppUI");
+        var binDir = Path.Combine(subDir, "bin");
+        Directory.CreateDirectory(binDir);
+        File.Create(Path.Combine(binDir, "WebAppUI.dll")).Dispose();
+
+        var result = WebAppInstaller.LocateWebRoot(_tempRoot);
+        result.Should().Be(subDir);
+    }
+
+    [Fact]
+    public void LocateWebRoot_WhenEmptyDirectory_ReturnsNull()
+    {
+        Directory.CreateDirectory(_tempRoot);
+        var result = WebAppInstaller.LocateWebRoot(_tempRoot);
+        result.Should().BeNull();
+    }
+
+    // ============================================================
     //  CopyFabricanteConfigDll — error paths
     // ============================================================
 
@@ -153,10 +252,7 @@ public class WebAppInstallerTests : IDisposable
     public void CopyFabricanteConfigDll_SourceDirNotFound_ReturnsFalse()
     {
         var paths = new InstallationPaths(Path.Combine(_tempRoot, "SoftPrime"));
-        // paths.Fabricantes doesn't exist
-
         var result = WebAppInstaller.CopyFabricanteConfigDll(paths);
-
         result.Should().BeFalse();
     }
 
@@ -165,12 +261,10 @@ public class WebAppInstallerTests : IDisposable
     {
         var paths = new InstallationPaths(Path.Combine(_tempRoot, "SoftPrime"));
         Directory.CreateDirectory(paths.Fabricantes);
-        // Create non-matching files
         File.Create(Path.Combine(paths.Fabricantes, "readme.txt")).Dispose();
         File.Create(Path.Combine(paths.Fabricantes, "other.dll")).Dispose();
 
         var result = WebAppInstaller.CopyFabricanteConfigDll(paths);
-
         result.Should().BeFalse();
     }
 
@@ -208,24 +302,19 @@ public class WebAppInstallerTests : IDisposable
     [Fact]
     public void LocateInstalledPath_ForcedPathNotExists_SubfolderExists_ReturnsSubfolder()
     {
-        // forcedInstallPath doesn't have files, but subfolder does
         var subfolder = Path.Combine(_tempRoot, "WebAppDS");
         Directory.CreateDirectory(subfolder);
         File.Create(Path.Combine(subfolder, "app.dll")).Dispose();
 
         var result = WebAppInstaller.LocateInstalledPath(_tempRoot, "WebAppDS");
-
         result.Should().Be(subfolder);
     }
 
     [Fact]
     public void LocateInstalledPath_ForcedPathNotExists_SubfolderNotExists_ReturnsNull()
     {
-        // Neither forced path nor subfolder have deployable files
         Directory.CreateDirectory(_tempRoot);
-
         var result = WebAppInstaller.LocateInstalledPath(_tempRoot, "WebAppDS");
-
         result.Should().BeNull();
     }
 
@@ -241,7 +330,6 @@ public class WebAppInstallerTests : IDisposable
         File.Create(Path.Combine(deepDir, "app.dll")).Dispose();
 
         var result = WebAppInstaller.HasDeployableFiles(_tempRoot, SearchOption.AllDirectories);
-
         result.Should().BeTrue();
     }
 
@@ -253,7 +341,6 @@ public class WebAppInstallerTests : IDisposable
         File.Create(Path.Combine(deepDir, "app.dll")).Dispose();
 
         var result = WebAppInstaller.HasDeployableFiles(_tempRoot, SearchOption.TopDirectoryOnly);
-
         result.Should().BeFalse();
     }
 
@@ -264,5 +351,6 @@ public class WebAppInstallerTests : IDisposable
             try { Directory.Delete(_tempRoot, true); }
             catch { /* cleanup on best-effort basis */ }
         }
+        GC.SuppressFinalize(this);
     }
 }

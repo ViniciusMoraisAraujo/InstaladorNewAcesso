@@ -1,4 +1,4 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using InstaladorNewAcesso.Core.Configurations;
 using InstaladorNewAcesso.Abstractions.Models;
 
@@ -8,7 +8,14 @@ public class DirectorySetupTests
 {
     private const string TestBasePath = @"C:\SoftPrime";
     private readonly InstallationPaths _paths = new(TestBasePath);
-    private readonly DirectorySetup _sut = new();
+
+    [Fact]
+    public void GetAllPaths_ShouldIncludeInstallationPath()
+    {
+        var paths = DirectorySetup.GetAllPaths(_paths).ToList();
+
+        paths.Should().Contain($@"{TestBasePath}\Instaladores");
+    }
 
     [Fact]
     public void GetAllPaths_ShouldIncludeAllBaseFolders()
@@ -58,10 +65,10 @@ public class DirectorySetupTests
     [Fact]
     public void GetAllPaths_ShouldHaveCorrectTotalCount()
     {
-        // 9 base folders + 4 Controller children + 3 ControllerOffline children + 1 WebAppUI child = 17
+        // 1 InstallationPath + 9 base folders + 4 Controller children + 3 ControllerOffline children + 1 WebAppUI child = 18
         var paths = DirectorySetup.GetAllPaths(_paths).ToList();
 
-        paths.Should().HaveCount(17);
+        paths.Should().HaveCount(18);
     }
 
     [Fact]
